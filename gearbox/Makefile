@@ -3,8 +3,8 @@ SIM ?= verilator
 TOPLEVEL_LANG ?= verilog
 
 # parameters
-IN_DB ?= 3
-OUT_DB ?= 5
+INPUT_BYTES_PER_BEAT ?= 3
+OUTPUT_BYTES_PER_BEAT ?= 5
 WAVES ?= 1
 
 ifeq ($(TOPLEVEL_LANG),verilog)
@@ -12,12 +12,12 @@ ifeq ($(TOPLEVEL_LANG),verilog)
     VERILOG_SOURCES = $(PWD)/gearbox.sv
 
     ifeq ($(SIM),icarus)
-        COMPILE_ARGS += -Pgearbox.IN_DB=$(IN_DB)
-        COMPILE_ARGS += -Pgearbox.OUT_DB=$(OUT_DB)
+        COMPILE_ARGS += -Pgearbox.INPUT_BYTES_PER_BEAT=$(INPUT_BYTES_PER_BEAT)
+        COMPILE_ARGS += -Pgearbox.OUTPUT_BYTES_PER_BEAT=$(OUTPUT_BYTES_PER_BEAT)
 
     else ifeq ($(SIM),verilator)
-        COMPILE_ARGS += -GIN_DB=$(IN_DB)
-        COMPILE_ARGS += -GOUT_DB=$(OUT_DB)
+        COMPILE_ARGS += -GINPUT_BYTES_PER_BEAT=$(INPUT_BYTES_PER_BEAT)
+        COMPILE_ARGS += -GOUTPUT_BYTES_PER_BEAT=$(OUTPUT_BYTES_PER_BEAT)
         COMPILE_ARGS += --timing
         COMPILE_ARGS += --assert
         COMPILE_ARGS += -Wno-WIDTHTRUNC
@@ -28,8 +28,8 @@ ifeq ($(TOPLEVEL_LANG),verilog)
         endif
 
     else ifneq ($(filter $(SIM),ius xcelium),)
-        EXTRA_ARGS += -defparam "gearbox.IN_DB=$(IN_DB)"
-        EXTRA_ARGS += -defparam "gearbox.OUT_DB=$(OUT_DB)"
+        EXTRA_ARGS += -defparam "gearbox.INPUT_BYTES_PER_BEAT=$(INPUT_BYTES_PER_BEAT)"
+        EXTRA_ARGS += -defparam "gearbox.OUTPUT_BYTES_PER_BEAT=$(OUTPUT_BYTES_PER_BEAT)"
 
     endif
 

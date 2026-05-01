@@ -1,25 +1,25 @@
 module gearbox #(
-  parameter IN_DB  = 4,
-  parameter OUT_DB = 5,
+  parameter INPUT_BYTES_PER_BEAT  = 4,
+  parameter OUTPUT_BYTES_PER_BEAT = 5,
 
   localparam int BITS_PER_BYTE = 8,
 
-  localparam INPUT_DATA_WIDTH  = BITS_PER_BYTE * IN_DB,
-  localparam OUTPUT_DATA_WIDTH = BITS_PER_BYTE * OUT_DB,
+  localparam INPUT_DATA_WIDTH  = BITS_PER_BYTE * INPUT_BYTES_PER_BEAT,
+  localparam OUTPUT_DATA_WIDTH = BITS_PER_BYTE * OUTPUT_BYTES_PER_BEAT,
 
-  localparam int MAX_TRANSFER_BYTES    = (IN_DB > OUT_DB) ? IN_DB : OUT_DB,
+  localparam int MAX_TRANSFER_BYTES    = (INPUT_BYTES_PER_BEAT > OUTPUT_BYTES_PER_BEAT) ? INPUT_BYTES_PER_BEAT : OUTPUT_BYTES_PER_BEAT,
   localparam int BUFFER_CAPACITY_BYTES = 2 * MAX_TRANSFER_BYTES,
   localparam int BUFFER_DATA_WIDTH     = BITS_PER_BYTE * BUFFER_CAPACITY_BYTES,
 
   localparam int BUFFER_POINTER_WIDTH = $clog2(BUFFER_CAPACITY_BYTES),
   localparam int BUFFER_COUNT_WIDTH   = $clog2(BUFFER_CAPACITY_BYTES + 1),
 
-  localparam logic [BUFFER_POINTER_WIDTH-1:0] INPUT_POINTER_STEP   = IN_DB,
-  localparam logic [BUFFER_POINTER_WIDTH-1:0] OUTPUT_POINTER_STEP  = OUT_DB,
+  localparam logic [BUFFER_POINTER_WIDTH-1:0] INPUT_POINTER_STEP   = INPUT_BYTES_PER_BEAT,
+  localparam logic [BUFFER_POINTER_WIDTH-1:0] OUTPUT_POINTER_STEP  = OUTPUT_BYTES_PER_BEAT,
   localparam logic [BUFFER_POINTER_WIDTH:0]   BUFFER_POINTER_LIMIT = BUFFER_CAPACITY_BYTES,
 
-  localparam logic [BUFFER_COUNT_WIDTH-1:0] INPUT_BYTE_COUNT  = IN_DB,
-  localparam logic [BUFFER_COUNT_WIDTH-1:0] OUTPUT_BYTE_COUNT = OUT_DB,
+  localparam logic [BUFFER_COUNT_WIDTH-1:0] INPUT_BYTE_COUNT  = INPUT_BYTES_PER_BEAT,
+  localparam logic [BUFFER_COUNT_WIDTH-1:0] OUTPUT_BYTE_COUNT = OUTPUT_BYTES_PER_BEAT,
   localparam logic [BUFFER_COUNT_WIDTH-1:0] BUFFER_BYTE_COUNT = BUFFER_CAPACITY_BYTES
 )
 (
@@ -75,7 +75,7 @@ module gearbox #(
       stored_bytes_q <= stored_bytes_in;
   end
 
-  if(IN_DB < OUT_DB) begin : g_small_to_large
+  if(INPUT_BYTES_PER_BEAT < OUTPUT_BYTES_PER_BEAT) begin : g_small_to_large
 
     logic pack_data_valid_q;
     logic pack_data_valid_in;
@@ -155,10 +155,10 @@ module gearbox #(
 
       localparam logic [BUFFER_POINTER_WIDTH-1:0] OUT_BYTE_PTR = out_byte_i;
 
-      logic [IN_DB-1:0] write_byte_sel;
-      logic [BITS_PER_BYTE-1:0] [IN_DB-1:0] write_bit_sel;
+      logic [INPUT_BYTES_PER_BEAT-1:0] write_byte_sel;
+      logic [BITS_PER_BYTE-1:0] [INPUT_BYTES_PER_BEAT-1:0] write_bit_sel;
 
-      for(genvar in_byte_i = 0; in_byte_i < IN_DB; in_byte_i = in_byte_i + 1) begin : g_pack_data_in_byte
+      for(genvar in_byte_i = 0; in_byte_i < INPUT_BYTES_PER_BEAT; in_byte_i = in_byte_i + 1) begin : g_pack_data_in_byte
 
         localparam logic [BUFFER_POINTER_WIDTH:0] IN_BYTE_OFFSET = in_byte_i;
 
@@ -228,7 +228,7 @@ module gearbox #(
     end
 
   end
-  else if(IN_DB > OUT_DB) begin : g_large_to_small
+  else if(INPUT_BYTES_PER_BEAT > OUTPUT_BYTES_PER_BEAT) begin : g_large_to_small
 
     logic buffer_output_valid;
     logic buffer_output_moving;
@@ -323,7 +323,7 @@ module gearbox #(
          : rd_ptr_sum[BUFFER_POINTER_WIDTH-1:0])
       : rd_ptr_q;
 
-    for(genvar out_byte_i = 0; out_byte_i < OUT_DB; out_byte_i = out_byte_i + 1) begin : g_barrel_out_byte
+    for(genvar out_byte_i = 0; out_byte_i < OUTPUT_BYTES_PER_BEAT; out_byte_i = out_byte_i + 1) begin : g_barrel_out_byte
 
       localparam logic [BUFFER_POINTER_WIDTH:0] OUT_BYTE_OFFSET = out_byte_i;
 
