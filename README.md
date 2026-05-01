@@ -5,18 +5,8 @@ regression tests.
 
 ## Modules
 
-### Gearbox
-
-The `gearbox` module converts a ready/valid byte stream from `IN_DB` input bytes
-per beat to `OUT_DB` output bytes per beat while preserving byte order.
-
-Files are in [`gearbox/`](gearbox/):
-
-- `gearbox.sv` - parameterized SystemVerilog RTL.
-- `testbench.py` - cocotb regression testbench.
-- `Makefile` - cocotb simulation Makefile.
-- `run_random_params.py` - randomized parameter regression runner.
-- `README.md` - module-specific setup and run instructions.
+- [`gearbox/`](gearbox/) - see [`gearbox/README.md`](gearbox/README.md) for
+  module-specific setup, simulation options, and parameter details.
 
 ## Install Dependencies
 
@@ -63,6 +53,20 @@ After running a simulation with `WAVES=1`, open the generated waveform with:
 surfer gearbox/dump.vcd
 ```
 
+## VS Code Surfer Extension
+
+Surfer is also available as a VS Code extension. Install the extension named
+`surfer` from publisher `surfer-project` in the VS Code Extensions view.
+
+You can also install it from the command line:
+
+```sh
+code --install-extension surfer-project.surfer
+```
+
+After installation, open a generated `.vcd`, `.fst`, or `.ghw` file in VS Code
+to view the waveform with Surfer.
+
 ## Quick Start
 
 ```sh
@@ -77,5 +81,4 @@ cd gearbox
 ./run_random_params.py
 ```
 
-See [`gearbox/README.md`](gearbox/README.md) for simulation options and
-parameter details.
+See each module README for simulation options and parameter details.
