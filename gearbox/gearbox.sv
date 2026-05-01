@@ -45,11 +45,6 @@ module gearbox #(
   logic [CNT_W:0] stored_bytes_calc;
   logic [CNT_W:0] free_bytes_after_read;
 
-  initial begin
-    if(IN_DB == 0)  $error("gearbox requires IN_DB > 0");
-    if(OUT_DB == 0) $error("gearbox requires OUT_DB > 0");
-  end
-
   assign in_data_moving =
       valid_in
     & ready_out;
