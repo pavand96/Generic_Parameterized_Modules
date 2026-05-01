@@ -12,6 +12,7 @@ ready/valid backpressure.
 - `Makefile` - cocotb simulation Makefile.
 - `run_random_params.py` - randomized regression runner for multiple
   `INPUT_BYTES_PER_BEAT`/`OUTPUT_BYTES_PER_BEAT` parameter pairs.
+- `wavedrom.md` - sample ready/valid and backpressure waveforms.
 
 ## Parameters
 
@@ -49,6 +50,12 @@ Run Verilator in lint-only mode with assertions enabled:
 ```sh
 verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GINPUT_BYTES_PER_BEAT=3 -GOUTPUT_BYTES_PER_BEAT=5 gearbox.sv
 ```
+
+## Waveform Examples
+
+See [`wavedrom.md`](wavedrom.md) for sample WaveDrom timing diagrams covering
+input handshakes, output backpressure, packing behavior, and randomized
+backpressure.
 
 ## Randomized Regression
 
