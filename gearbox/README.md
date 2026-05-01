@@ -21,31 +21,6 @@ ready/valid backpressure.
 Both parameters must be greater than zero. Data widths are derived as
 `IN_DW = 8 * IN_DB` and `OUT_DW = 8 * OUT_DB`.
 
-## Install Dependencies
-
-This project uses cocotb for the Python testbench and Verilator as the default
-simulator.
-
-On Ubuntu or Debian, install Verilator and Python tooling:
-
-```sh
-sudo apt update
-sudo apt install verilator python3 python3-pip make
-```
-
-Install cocotb with pip:
-
-```sh
-python3 -m pip install cocotb
-```
-
-Check that both tools are available:
-
-```sh
-verilator --version
-cocotb-config --version
-```
-
 ## Run A Simulation
 
 The default simulator is Verilator.
