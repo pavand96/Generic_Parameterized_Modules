@@ -50,7 +50,7 @@ def input_bytes_for_beat(beat_idx, input_bytes_per_beat):
 
 
 async def reset_dut(dut):
-    dut.reset_n.value = 0
+    dut.rstn.value = 0
     dut.input_stream_valid.value = 0
     dut.output_stream_ready.value = 0
     dut.input_stream_data.value = 0
@@ -58,7 +58,7 @@ async def reset_dut(dut):
     for _ in range(3):
         await RisingEdge(dut.clk)
 
-    dut.reset_n.value = 1
+    dut.rstn.value = 1
     await RisingEdge(dut.clk)
 
 

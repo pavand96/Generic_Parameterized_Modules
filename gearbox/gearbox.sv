@@ -32,7 +32,7 @@ module gearbox #(
   output logic output_stream_valid,
 
   input clk,
-  input reset_n
+  input rstn
 );
 
   logic input_stream_transfer;
@@ -68,8 +68,8 @@ module gearbox #(
   assign stored_byte_count_next =
     next_stored_byte_count[BUFFER_COUNT_WIDTH-1:0];
 
-  always_ff @(posedge clk or negedge reset_n) begin
-    if(~reset_n)
+  always_ff @(posedge clk or negedge rstn) begin
+    if(~rstn)
       stored_byte_count_q <= '0;
     else
       stored_byte_count_q <= stored_byte_count_next;
@@ -212,8 +212,8 @@ module gearbox #(
         staged_input_data_q <= input_stream_data;
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
-      if(~reset_n) begin
+    always_ff @(posedge clk or negedge rstn) begin
+      if(~rstn) begin
         staged_input_valid_q <= '0;
         pack_buffer_data_q   <= '0;
         write_byte_pointer_q <= '0;
@@ -369,8 +369,8 @@ module gearbox #(
 
     end
 
-    always_ff @(posedge clk or negedge reset_n) begin
-      if(~reset_n) begin
+    always_ff @(posedge clk or negedge rstn) begin
+      if(~rstn) begin
         unpack_buffer_data_q <= '0;
         input_lane_q         <= '0;
         read_byte_pointer_q  <= '0;
@@ -389,8 +389,8 @@ module gearbox #(
   end
   else begin : g_equal_width
 
-    always_ff@(posedge clk or negedge reset_n) begin
-      if(~reset_n)
+    always_ff@(posedge clk or negedge rstn) begin
+      if(~rstn)
          output_stream_valid <= 1'b0;
       else
          output_stream_valid <=   input_stream_valid
@@ -413,27 +413,27 @@ module gearbox #(
 
 `ifndef SYNTHESIS
   assert_stored_byte_count_in_range:
-    assert property (@(posedge clk) disable iff (~reset_n)
+    assert property (@(posedge clk) disable iff (~rstn)
       stored_byte_count_q <= BUFFER_BYTE_COUNT)
     else $error("gearbox stored byte count exceeded buffer capacity");
 
   assert_no_byte_count_underflow:
-    assert property (@(posedge clk) disable iff (~reset_n)
+    assert property (@(posedge clk) disable iff (~rstn)
       {1'b0, bytes_removed} <= {1'b0, stored_byte_count_q})
     else $error("gearbox attempted to remove more bytes than stored");
 
   assert_next_byte_count_in_range:
-    assert property (@(posedge clk) disable iff (~reset_n)
+    assert property (@(posedge clk) disable iff (~rstn)
       next_stored_byte_count <= {1'b0, BUFFER_BYTE_COUNT})
     else $error("gearbox next stored byte count exceeded buffer capacity");
 
   assert_output_stream_valid_known:
-    assert property (@(posedge clk) disable iff (~reset_n)
+    assert property (@(posedge clk) disable iff (~rstn)
       !$isunknown(output_stream_valid))
     else $error("gearbox output_stream_valid is unknown");
 
   assert_output_stream_data_known_when_valid:
-    assert property (@(posedge clk) disable iff (~reset_n)
+    assert property (@(posedge clk) disable iff (~rstn)
       output_stream_valid |-> !$isunknown(output_stream_data))
     else $error("gearbox output_stream_data is unknown while output_stream_valid is high");
 `endif
