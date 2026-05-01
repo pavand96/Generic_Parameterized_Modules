@@ -42,6 +42,14 @@ Disable waveform tracing:
 make WAVES=0
 ```
 
+## Check Lint
+
+Run Verilator in lint-only mode with assertions enabled:
+
+```sh
+verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GINPUT_BYTES_PER_BEAT=3 -GOUTPUT_BYTES_PER_BEAT=5 gearbox.sv
+```
+
 ## Randomized Regression
 
 Run randomized parameter combinations:
