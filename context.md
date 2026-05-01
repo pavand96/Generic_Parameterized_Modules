@@ -1,129 +1,217 @@
-# Project Context
+# RTL And Simulation Style Context
 
-This repository is `pavand96/Generic_Parameterized_Modules`. The current module
-in the repo is `gearbox/`, a parameterized SystemVerilog byte-stream gearbox
-with cocotb tests.
+This note captures the preferred coding, naming, lint, and cocotb simulation
+style for modules in this repository. Keep it as reusable project guidance,
+not as a changelog for one module.
 
-## Repository Layout
+## RTL Naming Style
 
-- `README.md` - top-level repository overview, dependency installation, Surfer
-  setup, and quick-start commands.
-- `gearbox/README.md` - gearbox-specific parameters, simulation, lint, and
-  regression commands.
-- `gearbox/gearbox.sv` - SystemVerilog RTL.
-- `gearbox/testbench.py` - cocotb byte-stream regression testbench.
-- `gearbox/Makefile` - cocotb simulation Makefile.
-- `gearbox/run_random_params.py` - randomized parameter regression runner.
+Use descriptive names that state what a signal represents. Avoid short
+abbreviations unless they are established HDL conventions.
 
-Generated files are intentionally not tracked:
+Preferred:
 
-- `gearbox/sim_build/`
-- `gearbox/results.xml`
-- `gearbox/__pycache__/`
+- `input_stream_valid`, `input_stream_data`, `input_stream_ready`
+- `output_stream_valid`, `output_stream_data`, `output_stream_ready`
+- `INPUT_BYTES_PER_BEAT`, `OUTPUT_BYTES_PER_BEAT`
+- `INPUT_DATA_WIDTH`, `OUTPUT_DATA_WIDTH`
+- `BUFFER_CAPACITY_BYTES`, `BUFFER_POINTER_WIDTH`, `BUFFER_COUNT_WIDTH`
+- `stored_byte_count_q`, `stored_byte_count_next`
+- `bytes_added`, `bytes_removed`
+- `read_byte_pointer_q`, `write_byte_pointer_q`
 
-## Gearbox Interface
+Avoid:
 
-The public stream interface uses explicit input/output stream names:
+- unclear width names like `IN_DW`, `OUT_DW`, `CNT_W`, `PTR_W`
+- unclear byte-count names like `IN_DB`, `OUT_DB`, `BUF_DB`
+- vague temporary names like `candidate_hit`, `candidate_bit`
+- directionally confusing stream names such as `ready_out` for input-side ready
 
-- `input_stream_valid`
-- `input_stream_data`
-- `input_stream_ready`
-- `output_stream_ready`
-- `output_stream_data`
-- `output_stream_valid`
-- `clk`
-- `rstn`
+Use `_q` for registered state and `_next` for next-state combinational values.
+Use active-low reset name `rstn`.
 
-The active-low reset name is intentionally `rstn`.
+## Constants And Parameters
 
-## Parameters And Derived Widths
+Prefer named constants over raw literals when the literal has semantic meaning.
 
-The public byte-count parameters are:
+Examples:
 
-- `INPUT_BYTES_PER_BEAT`
-- `OUTPUT_BYTES_PER_BEAT`
+- `BITS_PER_BYTE = 8`
+- `BYTE_MASK = 0xFF` in Python testbenches
+- `BUFFER_CAPACITY_BYTES = 2 * MAX_TRANSFER_BYTES`
 
-Important derived names in `gearbox.sv`:
+Parameter names should describe units. Prefer `*_BYTES_PER_BEAT`,
+`*_DATA_WIDTH`, and `*_COUNT` over abbreviated suffixes.
 
-- `BITS_PER_BYTE`
-- `INPUT_DATA_WIDTH`
-- `OUTPUT_DATA_WIDTH`
-- `MAX_TRANSFER_BYTES`
-- `BUFFER_CAPACITY_BYTES`
-- `BUFFER_DATA_WIDTH`
-- `BUFFER_POINTER_WIDTH`
-- `BUFFER_COUNT_WIDTH`
+## Interface Style
 
-Older names such as `IN_DB`, `OUT_DB`, `IN_DW`, `OUT_DW`, `CNT_W`, `PTR_W`,
-`BUF_DB`, `BUF_DW`, `candidate_hit`, and `candidate_bit` were replaced with
-more descriptive names.
+For ready/valid streams, name signals by stream side:
 
-## Assertions
+```systemverilog
+input  logic                  input_stream_valid,
+input  logic [DATA_WIDTH-1:0] input_stream_data,
+output logic                  input_stream_ready,
 
-Assertions live at the end of `gearbox.sv` and use labeled concurrent
-`assert property` statements. They check:
+input  logic                  output_stream_ready,
+output logic [DATA_WIDTH-1:0] output_stream_data,
+output logic                  output_stream_valid
+```
 
-- stored byte count does not exceed buffer capacity
-- bytes removed never exceed stored bytes
-- next stored byte count stays in range
-- `output_stream_valid` is never unknown after reset
-- `output_stream_data` is not unknown when `output_stream_valid` is high
+This makes it clear that `input_stream_ready` is the module's readiness to
+accept input, while `output_stream_ready` comes from the downstream consumer.
 
-Verilator assertions are enabled in `gearbox/Makefile` with `--assert`.
+## Assertion Style
 
-## Verification Commands
+Put module-level assertions near the end of the RTL, just before `endmodule`,
+inside:
 
-Run from `gearbox/`.
+```systemverilog
+`ifndef SYNTHESIS
+  // assertions
+`endif
+```
 
-Lint:
+Use labeled concurrent assertions:
+
+```systemverilog
+assert_output_stream_valid_known:
+  assert property (@(posedge clk) disable iff (~rstn)
+    !$isunknown(output_stream_valid))
+  else $error("module output_stream_valid is unknown");
+```
+
+Useful assertion categories:
+
+- counter range checks
+- underflow and overflow checks
+- known-value checks on valid/control signals
+- data known when valid is high
+
+Enable assertions in Verilator simulations with `--assert`.
+
+## Verilator Lint
+
+Run lint from the module directory. Use the same parameters and warning options
+as the simulation Makefile.
 
 ```sh
 verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GINPUT_BYTES_PER_BEAT=3 -GOUTPUT_BYTES_PER_BEAT=5 gearbox.sv
 ```
 
-Default cocotb regression:
+Keep the lint command documented in the module README. If more modules are
+added, each module README should include its own lint command.
 
-```sh
-make WAVES=0
+## cocotb Testbench Style
+
+Keep testbench helper names descriptive:
+
+- `signal_byte_width`
+- `bytes_to_word`
+- `word_to_bytes`
+- `signal_to_int`
+- `aligned_input_beats`
+- `input_bytes_for_beat`
+
+Use named constants in the testbench:
+
+```python
+CLK_PERIOD_NS = 1
+BITS_PER_BYTE = 8
+BYTE_MASK = 0xFF
 ```
 
-Randomized parameter smoke test:
+Convert unresolved HDL values into assertion failures with a helper:
+
+```python
+def signal_to_int(signal, name):
+    try:
+        return int(signal.value)
+    except ValueError as exc:
+        raise AssertionError(f"{name} has unresolved bits: {signal.value}") from exc
+```
+
+## Random Backpressure Pattern
+
+Drive `valid` and `ready` independently with seeded randomness. Hold an input
+beat stable until the input handshake completes.
+
+Pattern:
+
+```python
+if not held_valid and sent_beats < input_beats:
+    held_valid = rng.random() < valid_probability
+    if held_valid:
+        held_bytes = input_bytes_for_beat(sent_beats, input_bytes_per_beat)
+        held_word = bytes_to_word(held_bytes)
+
+dut.input_stream_valid.value = int(held_valid)
+dut.input_stream_data.value = held_word if held_valid else 0
+
+draining = sent_beats >= input_beats and not held_valid
+ready_probability_now = 1.0 if draining else ready_probability
+dut.output_stream_ready.value = int(rng.random() < ready_probability_now)
+```
+
+After a short timer delay, sample ready/valid and update the scoreboard only on
+handshakes:
+
+```python
+input_handshake = held_valid and input_stream_ready
+output_handshake = output_stream_valid and output_stream_ready
+```
+
+When draining after all inputs are sent, force output ready high so the test can
+complete deterministically.
+
+## Scoreboard Style
+
+Use a byte queue as the reference model for stream ordering.
+
+- Push expected bytes into a `deque` on input handshake.
+- Pop `output_bytes_per_beat` bytes on output handshake.
+- Compare output bytes exactly.
+- Assert the queue is empty at the end of the test.
+- After drain, hold output ready high for a few cycles and check valid drops.
+
+This keeps the test independent of the internal implementation.
+
+## Randomized Parameter Regression
+
+Use a small Python runner to exercise multiple parameter combinations by calling
+`make` with generated parameter values.
+
+Recommended options:
+
+- `--iterations`
+- `--seed`
+- `--min-bytes-per-beat`
+- `--max-bytes-per-beat`
+- `--keep-going`
+- `--waves`
+
+Always print the seed so a failing random run can be reproduced.
+
+Useful smoke command:
 
 ```sh
 ./run_random_params.py -n 1 --min-bytes-per-beat 1 --max-bytes-per-beat 4 --waves 0
 ```
 
-Larger randomized regression:
+Useful broader regression:
 
 ```sh
 ./run_random_params.py -n 50 --min-bytes-per-beat 1 --max-bytes-per-beat 16 --keep-going --waves 0
 ```
 
-## Tooling Context
+## Standard Verification Flow
 
-The top-level README documents installation for:
+Before committing RTL or testbench changes, run:
 
-- Verilator
-- Python and pip
-- cocotb
-- Surfer waveform viewer
-- Surfer VS Code extension: `surfer-project.surfer`
+```sh
+verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GINPUT_BYTES_PER_BEAT=3 -GOUTPUT_BYTES_PER_BEAT=5 gearbox.sv
+make WAVES=0
+./run_random_params.py -n 1 --min-bytes-per-beat 1 --max-bytes-per-beat 4 --waves 0
+```
 
-## Recent Work Summary
-
-Recent commits cleaned up and documented the gearbox module:
-
-- moved project files into `gearbox/`
-- added top-level and module READMEs
-- moved dependency installation instructions to the top-level README
-- added Surfer and VS Code Surfer extension notes
-- renamed unclear internal RTL signals
-- renamed public parameters to `INPUT_BYTES_PER_BEAT` and
-  `OUTPUT_BYTES_PER_BEAT`
-- renamed stream ports to explicit `input_stream_*` and `output_stream_*`
-- kept reset as `rstn`
-- added and expanded assertions
-- documented the Verilator lint command
-
-The latest verified state passed Verilator lint, the cocotb regression, and a
-one-iteration randomized parameter regression.
+Generated simulation artifacts such as `sim_build/`, `results.xml`, and
+`__pycache__/` should stay untracked.
