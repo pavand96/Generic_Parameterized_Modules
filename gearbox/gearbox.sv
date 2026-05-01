@@ -158,7 +158,7 @@ module gearbox #(
 
       localparam logic [PTR_W-1:0] OUT_BYTE_PTR = out_byte_i;
 
-      logic [IN_DB-1:0] candidate_hit;
+      logic [IN_DB-1:0] write_byte_sel;
       logic [7:0] [IN_DB-1:0] candidate_bit;
 
       for(genvar in_byte_i = 0; in_byte_i < IN_DB; in_byte_i = in_byte_i + 1) begin : g_pack_data_in_byte
@@ -182,12 +182,12 @@ module gearbox #(
           ? write_byte_wrap[PTR_W-1:0]
           : write_byte_sum[PTR_W-1:0];
 
-        assign candidate_hit[in_byte_i] =
+        assign write_byte_sel[in_byte_i] =
           write_byte_ptr == OUT_BYTE_PTR;
 
         for(genvar bit_i = 0; bit_i < 8; bit_i = bit_i + 1) begin : g_pack_data_bit
           assign candidate_bit[bit_i][in_byte_i] =
-              candidate_hit[in_byte_i]
+              write_byte_sel[in_byte_i]
             & pack_data_q[8*in_byte_i + bit_i];
         end
 
@@ -199,7 +199,7 @@ module gearbox #(
       end
 
       assign packrot_write_mask[8*out_byte_i +: 8] =
-        (|candidate_hit)
+        (|write_byte_sel)
         ? 8'hFF
         : 8'h00;
 
@@ -334,7 +334,7 @@ module gearbox #(
       logic [PTR_W:0] read_byte_wrap;
       logic [PTR_W-1:0] read_byte_ptr;
 
-      logic [BUF_DB-1:0] candidate_hit;
+      logic [BUF_DB-1:0] buffer_byte_sel;
       logic [BUF_DB-1:0] candidate_bit [7:0];
 
       assign read_byte_sum =
@@ -354,12 +354,12 @@ module gearbox #(
 
         localparam logic [PTR_W-1:0] BUFFER_BYTE_PTR = buf_byte_i;
 
-        assign candidate_hit[buf_byte_i] =
+        assign buffer_byte_sel[buf_byte_i] =
           read_byte_ptr == BUFFER_BYTE_PTR;
 
         for(genvar bit_i = 0; bit_i < 8; bit_i = bit_i + 1) begin : g_buffer_bit
           assign candidate_bit[bit_i][buf_byte_i] =
-              candidate_hit[buf_byte_i]
+              buffer_byte_sel[buf_byte_i]
             & unpack_data_q[8*buf_byte_i + bit_i];
         end
 
