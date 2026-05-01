@@ -146,8 +146,8 @@ module gearbox #(
     assign wr_ptr_in =
         pack_data_moving
       ? ((wr_ptr_sum >= BUF_DB_PTR)
-      ? wr_ptr_wrap[PTR_W-1:0]
-      : wr_ptr_sum[PTR_W-1:0])
+        ? wr_ptr_wrap[PTR_W-1:0]
+        : wr_ptr_sum[PTR_W-1:0])
       : wr_ptr_q;
 
     assign rd_lane_in =
