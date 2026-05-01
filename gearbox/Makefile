@@ -19,6 +19,7 @@ ifeq ($(TOPLEVEL_LANG),verilog)
         COMPILE_ARGS += -GIN_DB=$(IN_DB)
         COMPILE_ARGS += -GOUT_DB=$(OUT_DB)
         COMPILE_ARGS += --timing
+        COMPILE_ARGS += --assert
         COMPILE_ARGS += -Wno-WIDTHTRUNC
 
         ifeq ($(WAVES),1)
