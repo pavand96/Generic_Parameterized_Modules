@@ -2,12 +2,14 @@ module gearbox #(
   parameter IN_DB  = 4,
   parameter OUT_DB = 5,
 
-  localparam IN_DW  = 8 * IN_DB,
-  localparam OUT_DW = 8 * OUT_DB,
+  localparam int BITS_PER_BYTE = 8,
+
+  localparam IN_DW  = BITS_PER_BYTE * IN_DB,
+  localparam OUT_DW = BITS_PER_BYTE * OUT_DB,
 
   localparam int MAX_TRANSFER_BYTES    = (IN_DB > OUT_DB) ? IN_DB : OUT_DB,
   localparam int BUFFER_CAPACITY_BYTES = 2 * MAX_TRANSFER_BYTES,
-  localparam int BUFFER_DATA_WIDTH     = 8 * BUFFER_CAPACITY_BYTES,
+  localparam int BUFFER_DATA_WIDTH     = BITS_PER_BYTE * BUFFER_CAPACITY_BYTES,
 
   localparam int BUFFER_POINTER_WIDTH = $clog2(BUFFER_CAPACITY_BYTES),
   localparam int BUFFER_COUNT_WIDTH   = $clog2(BUFFER_CAPACITY_BYTES + 1),
@@ -169,7 +171,7 @@ module gearbox #(
       localparam logic [BUFFER_POINTER_WIDTH-1:0] OUT_BYTE_PTR = out_byte_i;
 
       logic [IN_DB-1:0] write_byte_sel;
-      logic [7:0] [IN_DB-1:0] write_bit_sel;
+      logic [BITS_PER_BYTE-1:0] [IN_DB-1:0] write_bit_sel;
 
       for(genvar in_byte_i = 0; in_byte_i < IN_DB; in_byte_i = in_byte_i + 1) begin : g_pack_data_in_byte
 
@@ -195,23 +197,23 @@ module gearbox #(
         assign write_byte_sel[in_byte_i] =
           write_byte_ptr == OUT_BYTE_PTR;
 
-        for(genvar bit_i = 0; bit_i < 8; bit_i = bit_i + 1) begin : g_pack_data_bit
+        for(genvar bit_i = 0; bit_i < BITS_PER_BYTE; bit_i = bit_i + 1) begin : g_pack_data_bit
           assign write_bit_sel[bit_i][in_byte_i] =
               write_byte_sel[in_byte_i]
-            & pack_data_q[8*in_byte_i + bit_i];
+            & pack_data_q[BITS_PER_BYTE*in_byte_i + bit_i];
         end
 
       end
 
-      for(genvar bit_i = 0; bit_i < 8; bit_i = bit_i + 1) begin : g_packrot_bit
-        assign packrot_write_data[8*out_byte_i + bit_i] =
+      for(genvar bit_i = 0; bit_i < BITS_PER_BYTE; bit_i = bit_i + 1) begin : g_packrot_bit
+        assign packrot_write_data[BITS_PER_BYTE*out_byte_i + bit_i] =
           |write_bit_sel[bit_i];
       end
 
-      assign packrot_write_mask[8*out_byte_i +: 8] =
+      assign packrot_write_mask[BITS_PER_BYTE*out_byte_i +: BITS_PER_BYTE] =
         (|write_byte_sel)
-        ? 8'hFF
-        : 8'h00;
+        ? {BITS_PER_BYTE{1'b1}}
+        : {BITS_PER_BYTE{1'b0}};
 
     end
 
@@ -345,7 +347,7 @@ module gearbox #(
       logic [BUFFER_POINTER_WIDTH-1:0] read_byte_ptr;
 
       logic [BUFFER_CAPACITY_BYTES-1:0] buffer_byte_sel;
-      logic [BUFFER_CAPACITY_BYTES-1:0] buffer_bit_sel [7:0];
+      logic [BUFFER_CAPACITY_BYTES-1:0] buffer_bit_sel [BITS_PER_BYTE-1:0];
 
       assign read_byte_sum =
           {1'b0, rd_ptr_q}
@@ -367,16 +369,16 @@ module gearbox #(
         assign buffer_byte_sel[buf_byte_i] =
           read_byte_ptr == BUFFER_BYTE_PTR;
 
-        for(genvar bit_i = 0; bit_i < 8; bit_i = bit_i + 1) begin : g_buffer_bit
+        for(genvar bit_i = 0; bit_i < BITS_PER_BYTE; bit_i = bit_i + 1) begin : g_buffer_bit
           assign buffer_bit_sel[bit_i][buf_byte_i] =
               buffer_byte_sel[buf_byte_i]
-            & unpack_data_q[8*buf_byte_i + bit_i];
+            & unpack_data_q[BITS_PER_BYTE*buf_byte_i + bit_i];
         end
 
       end
 
-      for(genvar bit_i = 0; bit_i < 8; bit_i = bit_i + 1) begin : g_barrel_out_bit
-        assign barrel_data_out[8*out_byte_i + bit_i] =
+      for(genvar bit_i = 0; bit_i < BITS_PER_BYTE; bit_i = bit_i + 1) begin : g_barrel_out_bit
+        assign barrel_data_out[BITS_PER_BYTE*out_byte_i + bit_i] =
             |buffer_bit_sel[bit_i];
       end
 
