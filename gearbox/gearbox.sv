@@ -4,8 +4,8 @@ module gearbox #(
 
   localparam int BITS_PER_BYTE = 8,
 
-  localparam IN_DW  = BITS_PER_BYTE * IN_DB,
-  localparam OUT_DW = BITS_PER_BYTE * OUT_DB,
+  localparam INPUT_DATA_WIDTH  = BITS_PER_BYTE * IN_DB,
+  localparam OUTPUT_DATA_WIDTH = BITS_PER_BYTE * OUT_DB,
 
   localparam int MAX_TRANSFER_BYTES    = (IN_DB > OUT_DB) ? IN_DB : OUT_DB,
   localparam int BUFFER_CAPACITY_BYTES = 2 * MAX_TRANSFER_BYTES,
@@ -24,11 +24,11 @@ module gearbox #(
 )
 (
   input valid_in,
-  input [IN_DW-1:0] data_in,
+  input [INPUT_DATA_WIDTH-1:0] data_in,
   output logic ready_out,
 
   input ready_in,
-  output logic [OUT_DW-1:0] data_out,
+  output logic [OUTPUT_DATA_WIDTH-1:0] data_out,
   output logic valid_out,
 
   input clk,
@@ -75,21 +75,6 @@ module gearbox #(
       stored_bytes_q <= stored_bytes_in;
   end
 
-`ifndef SYNTHESIS
-  always_ff @(posedge clk) begin
-    if(rstn) begin
-      assert (stored_bytes_q <= BUFFER_BYTE_COUNT)
-        else $error("gearbox stored byte count exceeded buffer capacity");
-
-      assert ({1'b0, bytes_dec} <= {1'b0, stored_bytes_q})
-        else $error("gearbox attempted to remove more bytes than stored");
-
-      assert (stored_bytes_calc <= {1'b0, BUFFER_BYTE_COUNT})
-        else $error("gearbox next stored byte count exceeded buffer capacity");
-    end
-  end
-`endif
-
   if(IN_DB < OUT_DB) begin : g_small_to_large
 
     logic pack_data_valid_q;
@@ -98,7 +83,7 @@ module gearbox #(
     logic packrot_has_space;
     logic pack_data_moving;
 
-    logic [IN_DW-1:0] pack_data_q;
+    logic [INPUT_DATA_WIDTH-1:0] pack_data_q;
 
     logic [BUFFER_DATA_WIDTH-1:0] packrot_data_q;
     logic [BUFFER_DATA_WIDTH-1:0] packrot_data_in;
@@ -115,8 +100,8 @@ module gearbox #(
 
     assign data_out =
         rd_lane_q
-      ? packrot_data_q[2*OUT_DW-1:OUT_DW]
-      : packrot_data_q[OUT_DW-1:0];
+      ? packrot_data_q[2*OUTPUT_DATA_WIDTH-1:OUTPUT_DATA_WIDTH]
+      : packrot_data_q[OUTPUT_DATA_WIDTH-1:0];
 
     assign valid_out =
       stored_bytes_q >= OUTPUT_BYTE_COUNT;
@@ -254,9 +239,9 @@ module gearbox #(
     logic out_stage_valid_q;
     logic out_stage_valid_in;
 
-    logic [OUT_DW-1:0] out_stage_data_q;
-    logic [OUT_DW-1:0] out_stage_data_in;
-    logic [OUT_DW-1:0] barrel_data_out;
+    logic [OUTPUT_DATA_WIDTH-1:0] out_stage_data_q;
+    logic [OUTPUT_DATA_WIDTH-1:0] out_stage_data_in;
+    logic [OUTPUT_DATA_WIDTH-1:0] barrel_data_out;
 
     logic [BUFFER_DATA_WIDTH-1:0] unpack_data_q;
     logic [BUFFER_DATA_WIDTH-1:0] unpack_data_in;
@@ -319,8 +304,8 @@ module gearbox #(
     assign unpack_data_in =
         in_data_moving
       ? (  wr_lane_q
-        ? {data_in, unpack_data_q[IN_DW-1:0]}
-        : {unpack_data_q[2*IN_DW-1:IN_DW], data_in})
+        ? {data_in, unpack_data_q[INPUT_DATA_WIDTH-1:0]}
+        : {unpack_data_q[2*INPUT_DATA_WIDTH-1:INPUT_DATA_WIDTH], data_in})
       : unpack_data_q;
 
     assign rd_ptr_sum =
@@ -425,5 +410,32 @@ module gearbox #(
     assign bytes_dec = '0;
 
   end
+
+`ifndef SYNTHESIS
+  assert_stored_byte_count_in_range:
+    assert property (@(posedge clk) disable iff (~rstn)
+      stored_bytes_q <= BUFFER_BYTE_COUNT)
+    else $error("gearbox stored byte count exceeded buffer capacity");
+
+  assert_no_byte_count_underflow:
+    assert property (@(posedge clk) disable iff (~rstn)
+      {1'b0, bytes_dec} <= {1'b0, stored_bytes_q})
+    else $error("gearbox attempted to remove more bytes than stored");
+
+  assert_next_byte_count_in_range:
+    assert property (@(posedge clk) disable iff (~rstn)
+      stored_bytes_calc <= {1'b0, BUFFER_BYTE_COUNT})
+    else $error("gearbox next stored byte count exceeded buffer capacity");
+
+  assert_valid_out_known:
+    assert property (@(posedge clk) disable iff (~rstn)
+      !$isunknown(valid_out))
+    else $error("gearbox valid_out is unknown");
+
+  assert_data_out_known_when_valid:
+    assert property (@(posedge clk) disable iff (~rstn)
+      valid_out |-> !$isunknown(data_out))
+    else $error("gearbox data_out is unknown while valid_out is high");
+`endif
 
 endmodule
