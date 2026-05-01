@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="430" viewBox="0 0 1040 430" role="img" aria-labelledby="title desc">
+  <title id="title">Gearbox datapath when input width is smaller than output width</title>
+  <desc id="desc">Input stream beats are staged, written into a circular pack buffer, and emitted as wider output stream beats.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#244766"/>
+    </marker>
+    <style>
+      .title { font: 700 24px Arial, sans-serif; fill: #16324f; }
+      .label { font: 600 15px Arial, sans-serif; fill: #17324d; }
+      .small { font: 13px Arial, sans-serif; fill: #334155; }
+      .tiny { font: 12px Arial, sans-serif; fill: #475569; }
+      .box { fill: #f8fafc; stroke: #244766; stroke-width: 2; rx: 8; }
+      .state { fill: #eef6ff; stroke: #2563eb; stroke-width: 2; rx: 8; }
+      .logic { fill: #f1f5f9; stroke: #64748b; stroke-width: 2; rx: 8; }
+      .buffer { fill: #fff7ed; stroke: #ea580c; stroke-width: 2; rx: 8; }
+      .out { fill: #ecfdf5; stroke: #059669; stroke-width: 2; rx: 8; }
+      .arrow { stroke: #244766; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+      .thin { stroke: #64748b; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+      .byte { fill: #fed7aa; stroke: #c2410c; stroke-width: 1.2; rx: 4; }
+    </style>
+  </defs>
+
+  <rect width="1040" height="430" fill="#ffffff"/>
+  <text x="40" y="44" class="title">INPUT_DATA_WIDTH &lt; OUTPUT_DATA_WIDTH: pack smaller beats into wider beats</text>
+
+  <rect x="40" y="95" width="160" height="95" class="box"/>
+  <text x="62" y="126" class="label">Input stream</text>
+  <text x="62" y="151" class="small">input_stream_valid</text>
+  <text x="62" y="171" class="small">input_stream_data</text>
+
+  <rect x="250" y="88" width="175" height="110" class="state"/>
+  <text x="273" y="119" class="label">Input staging</text>
+  <text x="273" y="145" class="small">staged_input_valid_q</text>
+  <text x="273" y="166" class="small">staged_input_data_q</text>
+
+  <rect x="485" y="82" width="225" height="122" class="buffer"/>
+  <text x="520" y="113" class="label">Circular pack buffer</text>
+  <text x="520" y="139" class="small">pack_buffer_data_q</text>
+  <text x="520" y="160" class="small">write_byte_pointer_q</text>
+  <text x="520" y="181" class="small">stored_byte_count_q</text>
+
+  <rect x="760" y="88" width="225" height="110" class="out"/>
+  <text x="797" y="119" class="label">Output stream</text>
+  <text x="797" y="145" class="small">output_stream_valid</text>
+  <text x="797" y="166" class="small">output_stream_data</text>
+
+  <path d="M200 142 L250 142" class="arrow"/>
+  <path d="M425 142 L485 142" class="arrow"/>
+  <path d="M710 142 L760 142" class="arrow"/>
+
+  <rect x="262" y="245" width="150" height="72" class="logic"/>
+  <text x="288" y="275" class="label">Input ready</text>
+  <text x="282" y="298" class="small">has space or no staged beat</text>
+  <path d="M337 245 L337 198" class="thin"/>
+  <path d="M337 245 C337 222, 135 222, 135 190" class="thin"/>
+
+  <rect x="510" y="245" width="180" height="88" class="logic"/>
+  <text x="540" y="276" class="label">Write select</text>
+  <text x="532" y="300" class="small">byte mask from pointer</text>
+  <text x="532" y="320" class="small">wrap at buffer limit</text>
+  <path d="M600 245 L600 204" class="thin"/>
+
+  <rect x="782" y="245" width="178" height="72" class="logic"/>
+  <text x="811" y="276" class="label">Output select</text>
+  <text x="802" y="300" class="small">emit when enough bytes stored</text>
+  <path d="M870 245 L870 198" class="thin"/>
+
+  <text x="48" y="365" class="label">Example byte flow</text>
+  <rect x="206" y="346" width="40" height="30" class="byte"/><text x="218" y="366" class="tiny">a0</text>
+  <rect x="250" y="346" width="40" height="30" class="byte"/><text x="262" y="366" class="tiny">a1</text>
+  <rect x="294" y="346" width="40" height="30" class="byte"/><text x="306" y="366" class="tiny">a2</text>
+  <path d="M346 361 L426 361" class="arrow"/>
+  <rect x="440" y="346" width="40" height="30" class="byte"/><text x="452" y="366" class="tiny">a0</text>
+  <rect x="484" y="346" width="40" height="30" class="byte"/><text x="496" y="366" class="tiny">a1</text>
+  <rect x="528" y="346" width="40" height="30" class="byte"/><text x="540" y="366" class="tiny">a2</text>
+  <rect x="572" y="346" width="40" height="30" class="byte"/><text x="584" y="366" class="tiny">b0</text>
+  <rect x="616" y="346" width="40" height="30" class="byte"/><text x="628" y="366" class="tiny">b1</text>
+  <path d="M668 361 L748 361" class="arrow"/>
+  <rect x="762" y="346" width="40" height="30" class="byte"/><text x="774" y="366" class="tiny">a0</text>
+  <rect x="806" y="346" width="40" height="30" class="byte"/><text x="818" y="366" class="tiny">a1</text>
+  <rect x="850" y="346" width="40" height="30" class="byte"/><text x="862" y="366" class="tiny">a2</text>
+  <rect x="894" y="346" width="40" height="30" class="byte"/><text x="906" y="366" class="tiny">b0</text>
+  <rect x="938" y="346" width="40" height="30" class="byte"/><text x="950" y="366" class="tiny">b1</text>
+</svg>

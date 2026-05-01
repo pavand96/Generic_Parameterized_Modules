@@ -13,6 +13,7 @@ ready/valid backpressure.
 - `run_random_params.py` - randomized regression runner for multiple
   `INPUT_BYTES_PER_BEAT`/`OUTPUT_BYTES_PER_BEAT` parameter pairs.
 - `wavedrom.md` - sample ready/valid and backpressure waveforms.
+- `circuit_diagrams.md` - SVG datapath sketches for pack and unpack modes.
 
 ## Parameters
 
@@ -56,6 +57,12 @@ verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GINPUT_BYTES_PER_BEAT=3
 See [`wavedrom.md`](wavedrom.md) for sample WaveDrom timing diagrams covering
 input handshakes, output backpressure, packing behavior, and randomized
 backpressure.
+
+## Circuit Diagrams
+
+See [`circuit_diagrams.md`](circuit_diagrams.md) for SVG sketches of the
+`INPUT_DATA_WIDTH < OUTPUT_DATA_WIDTH` and
+`INPUT_DATA_WIDTH > OUTPUT_DATA_WIDTH` datapaths.
 
 ## Randomized Regression
 
