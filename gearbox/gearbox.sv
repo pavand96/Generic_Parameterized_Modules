@@ -199,16 +199,18 @@ module gearbox #(
             staged_in_data_q <= in_strm_data;
         end
 
+        always_ff @(posedge clk) begin
+          pack_buffer_data_q <= pack_buffer_data_next;
+        end
+
         always_ff @(posedge clk or negedge rstn) begin
           if(~rstn) begin
             staged_in_vld_q <= '0;
-            pack_buffer_data_q <= '0;
             write_chunk_ptr_q <= '0;
             out_lane_q <= '0;
           end
           else begin
             staged_in_vld_q <= staged_in_vld_next;
-            pack_buffer_data_q <= pack_buffer_data_next;
             write_chunk_ptr_q <= write_chunk_ptr_next;
             out_lane_q <= out_lane_next;
           end
@@ -339,20 +341,21 @@ module gearbox #(
 
         end
 
+        always_ff @(posedge clk) begin
+          unpack_buffer_data_q <= unpack_buffer_data_next;
+          out_stage_data_q <= out_stage_data_next;
+        end
+
         always_ff @(posedge clk or negedge rstn) begin
           if(~rstn) begin
-            unpack_buffer_data_q <= '0;
             in_lane_q <= '0;
             read_chunk_ptr_q <= '0;
             out_stage_vld_q <= '0;
-            out_stage_data_q <= '0;
           end
           else begin
-            unpack_buffer_data_q <= unpack_buffer_data_next;
             in_lane_q <= in_lane_next;
             read_chunk_ptr_q <= read_chunk_ptr_next;
             out_stage_vld_q <= out_stage_vld_next;
-            out_stage_data_q <= out_stage_data_next;
           end
         end
 
@@ -437,16 +440,18 @@ module gearbox #(
 
     end
 
+    always_ff @(posedge clk) begin
+      pack_data_q <= pack_data_next;
+    end
+
     always_ff @(posedge clk or negedge rstn) begin
       if(~rstn) begin
         pack_in_idx_q <= '0;
         pack_out_vld_q <= '0;
-        pack_data_q <= '0;
       end
       else begin
         pack_in_idx_q <= pack_in_idx_next;
         pack_out_vld_q <= pack_out_vld_next;
-        pack_data_q <= pack_data_next;
       end
     end
 
@@ -495,15 +500,17 @@ module gearbox #(
       ? in_strm_data
       : (out_strm_tfer ? unpack_shift_data : unpack_data_q);
 
+    always_ff @(posedge clk) begin
+      unpack_data_q <= unpack_data_next;
+    end
+
     always_ff @(posedge clk or negedge rstn) begin
       if(~rstn) begin
         unpack_rem_count_q <= '0;
-        unpack_data_q <= '0;
         out_strm_vld <= 1'b0;
       end
       else begin
         unpack_rem_count_q <= unpack_rem_count_next;
-        unpack_data_q <= unpack_data_next;
         out_strm_vld <= out_strm_vld_next;
       end
     end
