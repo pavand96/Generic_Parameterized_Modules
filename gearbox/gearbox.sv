@@ -1,26 +1,26 @@
 module gearbox #(
-  parameter INPUT_BYTES_PER_BEAT  = 4,
-  parameter OUTPUT_BYTES_PER_BEAT = 5,
+  parameter       INPUT_BYTES_PER_BEAT  = 4,
+  parameter       OUTPUT_BYTES_PER_BEAT = 5,
 
   localparam int BITS_PER_BYTE = 8,
 
-  localparam INPUT_DATA_WIDTH  = BITS_PER_BYTE * INPUT_BYTES_PER_BEAT,
-  localparam OUTPUT_DATA_WIDTH = BITS_PER_BYTE * OUTPUT_BYTES_PER_BEAT,
+  localparam       INPUT_DATA_WIDTH        = BITS_PER_BYTE * INPUT_BYTES_PER_BEAT,
+  localparam       OUTPUT_DATA_WIDTH       = BITS_PER_BYTE * OUTPUT_BYTES_PER_BEAT,
 
-  localparam int MAX_TRANSFER_BYTES    = (INPUT_BYTES_PER_BEAT > OUTPUT_BYTES_PER_BEAT) ? INPUT_BYTES_PER_BEAT : OUTPUT_BYTES_PER_BEAT,
-  localparam int BUFFER_CAPACITY_BYTES = 2 * MAX_TRANSFER_BYTES,
-  localparam int BUFFER_DATA_WIDTH     = BITS_PER_BYTE * BUFFER_CAPACITY_BYTES,
+  localparam int   MAX_TRANSFER_BYTES      = (INPUT_BYTES_PER_BEAT > OUTPUT_BYTES_PER_BEAT) ? INPUT_BYTES_PER_BEAT : OUTPUT_BYTES_PER_BEAT,
+  localparam int   BUFFER_CAPACITY_BYTES   = 2 * MAX_TRANSFER_BYTES,
+  localparam int   BUFFER_DATA_WIDTH       = BITS_PER_BYTE * BUFFER_CAPACITY_BYTES,
 
-  localparam int BUFFER_POINTER_WIDTH = $clog2(BUFFER_CAPACITY_BYTES),
-  localparam int BUFFER_COUNT_WIDTH   = $clog2(BUFFER_CAPACITY_BYTES + 1),
+  localparam int   BUFFER_POINTER_WIDTH    = $clog2(BUFFER_CAPACITY_BYTES),
+  localparam int   BUFFER_COUNT_WIDTH      = $clog2(BUFFER_CAPACITY_BYTES + 1),
 
-  localparam logic [BUFFER_POINTER_WIDTH-1:0] INPUT_POINTER_STEP   = INPUT_BYTES_PER_BEAT,
-  localparam logic [BUFFER_POINTER_WIDTH-1:0] OUTPUT_POINTER_STEP  = OUTPUT_BYTES_PER_BEAT,
-  localparam logic [BUFFER_POINTER_WIDTH:0]   BUFFER_POINTER_LIMIT = BUFFER_CAPACITY_BYTES,
+  localparam logic [BUFFER_POINTER_WIDTH-1:0] INPUT_POINTER_STEP    = INPUT_BYTES_PER_BEAT,
+  localparam logic [BUFFER_POINTER_WIDTH-1:0] OUTPUT_POINTER_STEP   = OUTPUT_BYTES_PER_BEAT,
+  localparam logic [BUFFER_POINTER_WIDTH:0]   BUFFER_POINTER_LIMIT  = BUFFER_CAPACITY_BYTES,
 
-  localparam logic [BUFFER_COUNT_WIDTH-1:0] INPUT_BYTE_COUNT  = INPUT_BYTES_PER_BEAT,
-  localparam logic [BUFFER_COUNT_WIDTH-1:0] OUTPUT_BYTE_COUNT = OUTPUT_BYTES_PER_BEAT,
-  localparam logic [BUFFER_COUNT_WIDTH-1:0] BUFFER_BYTE_COUNT = BUFFER_CAPACITY_BYTES
+  localparam logic [BUFFER_COUNT_WIDTH-1:0]   INPUT_BYTE_COUNT      = INPUT_BYTES_PER_BEAT,
+  localparam logic [BUFFER_COUNT_WIDTH-1:0]   OUTPUT_BYTE_COUNT     = OUTPUT_BYTES_PER_BEAT,
+  localparam logic [BUFFER_COUNT_WIDTH-1:0]   BUFFER_BYTE_COUNT     = BUFFER_CAPACITY_BYTES
 )
 (
   input input_stream_valid,
@@ -104,7 +104,7 @@ module gearbox #(
       : pack_buffer_data_q[OUTPUT_DATA_WIDTH-1:0];
 
     assign output_stream_valid =
-      stored_byte_count_q >= OUTPUT_BYTE_COUNT;
+        stored_byte_count_q >= OUTPUT_BYTE_COUNT;
 
     assign bytes_removed =
         output_stream_transfer
@@ -192,11 +192,11 @@ module gearbox #(
 
       for(genvar bit_i = 0; bit_i < BITS_PER_BYTE; bit_i = bit_i + 1) begin : g_pack_buffer_bit
         assign pack_buffer_write_data[BITS_PER_BYTE*out_byte_i + bit_i] =
-          |write_bit_select[bit_i];
+                  |write_bit_select[bit_i];
       end
 
       assign pack_buffer_write_mask[BITS_PER_BYTE*out_byte_i +: BITS_PER_BYTE] =
-        (|write_byte_select)
+          (|write_byte_select)
         ? {BITS_PER_BYTE{1'b1}}
         : {BITS_PER_BYTE{1'b0}};
 
@@ -393,8 +393,9 @@ module gearbox #(
       if(~rstn)
          output_stream_valid <= 1'b0;
       else
-         output_stream_valid <=   input_stream_valid
-                     | (output_stream_valid & ~output_stream_ready);
+         output_stream_valid <= input_stream_valid
+                                  | (  output_stream_valid
+                                     & ~output_stream_ready);
     end
 
     always_ff@(posedge clk) begin
