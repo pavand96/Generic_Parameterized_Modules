@@ -4,7 +4,7 @@ module gearbox #(
   parameter int unsigned IN_DATA_WIDTH      = 24,
   parameter int unsigned OUT_DATA_WIDTH     = 40,
 
-  localparam int unsigned CHUNK_WIDTH       . = greatest_common_divisor(IN_DATA_WIDTH, OUT_DATA_WIDTH),
+  localparam int unsigned CHUNK_WIDTH         = greatest_common_divisor(IN_DATA_WIDTH, OUT_DATA_WIDTH),
   localparam int unsigned IN_CHUNKS_PER_BEAT  = IN_DATA_WIDTH / CHUNK_WIDTH,
   localparam int unsigned OUT_CHUNKS_PER_BEAT = OUT_DATA_WIDTH / CHUNK_WIDTH,
 
