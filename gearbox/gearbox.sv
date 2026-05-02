@@ -1,8 +1,8 @@
 module gearbox #(
-  parameter       INPUT_BYTES_PER_BEAT  = 4,
-  parameter       OUTPUT_BYTES_PER_BEAT = 5,
+  parameter        INPUT_BYTES_PER_BEAT    = 4,
+  parameter        OUTPUT_BYTES_PER_BEAT   = 5,
 
-  localparam int BITS_PER_BYTE = 8,
+  localparam int   BITS_PER_BYTE           = 8,
 
   localparam       INPUT_DATA_WIDTH        = BITS_PER_BYTE * INPUT_BYTES_PER_BEAT,
   localparam       OUTPUT_DATA_WIDTH       = BITS_PER_BYTE * OUTPUT_BYTES_PER_BEAT,
