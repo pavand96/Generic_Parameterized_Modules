@@ -60,11 +60,24 @@ which also requires `IN_CHUNKS_PER_BEAT != OUT_CHUNKS_PER_BEAT`.
 ## Area Warning
 
 Small derived `CHUNK_WIDTH` values can make `IN_CHUNKS_PER_BEAT` and
-`OUT_CHUNKS_PER_BEAT` large. In non-integer-ratio cases this can blow up area
-because the barrel datapath scales with the number of chunks and uses the
-larger `2 * MAX_TFER_CHUNKS` buffer. For very small chunk widths or very wide
-data paths, an FSM-style gearbox that moves fewer chunks per cycle may be a
-better area tradeoff.
+`OUT_CHUNKS_PER_BEAT` large. That matters most in non-integer-ratio cases,
+where this implementation keeps enough storage for `2 * MAX_TFER_CHUNKS` and
+uses combinational barrel logic to route chunks between arbitrary offsets.
+
+The barrel implementation is good when the design needs beat-level throughput:
+it can accept or produce a full strm beat whenever rdy/vld allows. The cost is
+that muxing and decode grow with the number of chunk lanes. If the GCD-derived
+`CHUNK_WIDTH` is small, a wide datapath can turn into many lanes, and each lane
+adds mux inputs, compare/decode logic, and buffer flops.
+
+An FSM-style gearbox can reduce area by serializing the work over multiple
+cycles. Instead of wiring every possible chunk rotation in parallel, it can use
+a smaller chunk mover, a counter, and a compact buffer to copy one chunk or a
+small group of chunks per cycle. That trades throughput and latency for less
+parallel muxing, fewer wide dynamic selects, and often easier timing. Use this
+barrel style for high-throughput paths; consider an FSM style when the data
+widths are large, the derived chunk width is small, or the interface can
+tolerate multi-cycle packing/unpacking.
 
 ## Run A Simulation
 
