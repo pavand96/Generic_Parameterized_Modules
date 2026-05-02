@@ -77,7 +77,7 @@ module gearbox #(
 
   end
   else if(NON_INTEGER_RATIO) begin : g_non_exact
-    if(WIDTH_CONVERT) begin : g_barrel
+    begin : g_barrel
 
       logic [BUFFER_COUNT_WIDTH-1:0] stored_chunk_count_q;
       logic [BUFFER_COUNT_WIDTH-1:0] stored_chunk_count_next;
