@@ -35,6 +35,9 @@ module gearbox #(
   input rstn
 );
 
+  // Handshake transfers are accepted only when valid and ready are high in the
+  // same cycle. The byte counters below use these pulses as the single source
+  // of truth for buffer occupancy.
   logic input_stream_transfer;
   logic output_stream_transfer;
 
@@ -75,6 +78,9 @@ module gearbox #(
       stored_byte_count_q <= stored_byte_count_next;
   end
 
+  // Pack mode: several narrow input beats are assembled into one wider output
+  // beat. The write side has variable byte alignment, while the read side
+  // selects one fixed output-width lane from the circular pack buffer.
   if(INPUT_BYTES_PER_BEAT < OUTPUT_BYTES_PER_BEAT) begin : g_small_to_large
 
     logic staged_input_valid_q;
@@ -151,6 +157,8 @@ module gearbox #(
         output_lane_q
       ^ output_stream_transfer;
 
+    // Write barrel: each staged input byte is decoded against the current
+    // write pointer and routed into the matching byte lane of the pack buffer.
     for(genvar out_byte_i = 0; out_byte_i < BUFFER_CAPACITY_BYTES; out_byte_i = out_byte_i + 1) begin : g_pack_buffer_byte
 
       localparam logic [BUFFER_POINTER_WIDTH-1:0] OUTPUT_BUFFER_BYTE_INDEX = out_byte_i;
@@ -230,6 +238,9 @@ module gearbox #(
   end
   else if(INPUT_BYTES_PER_BEAT > OUTPUT_BYTES_PER_BEAT) begin : g_large_to_small
 
+    // Unpack mode: one wide input beat is stored in an aligned buffer lane and
+    // then emitted as multiple narrower output beats. Backpressure is absorbed
+    // by the output stage so output data remains stable while valid is held.
     logic output_from_buffer_valid;
     logic output_from_buffer_transfer;
 
@@ -323,6 +334,8 @@ module gearbox #(
          : read_byte_pointer_sum[BUFFER_POINTER_WIDTH-1:0])
       : read_byte_pointer_q;
 
+    // Read barrel: each output byte lane selects the buffer byte addressed by
+    // the read pointer plus that lane's byte offset, wrapping at buffer depth.
     for(genvar out_byte_i = 0; out_byte_i < OUTPUT_BYTES_PER_BEAT; out_byte_i = out_byte_i + 1) begin : g_output_byte_selector
 
       localparam logic [BUFFER_POINTER_WIDTH:0] OUTPUT_BYTE_OFFSET = out_byte_i;
@@ -389,6 +402,8 @@ module gearbox #(
   end
   else begin : g_equal_width
 
+    // Equal-width mode is a one-beat ready/valid skid stage. No byte packing is
+    // needed, so the shared byte counter stays at zero.
     always_ff@(posedge clk or negedge rstn) begin
       if(~rstn)
          output_stream_valid <= 1'b0;
@@ -413,6 +428,8 @@ module gearbox #(
   end
 
 `ifndef SYNTHESIS
+  // Simulation-only protocol checks. These stay outside the generated datapath
+  // branches so the same safety properties apply to every parameter set.
   assert_stored_byte_count_in_range:
     assert property (@(posedge clk) disable iff (~rstn)
       stored_byte_count_q <= BUFFER_BYTE_COUNT)
