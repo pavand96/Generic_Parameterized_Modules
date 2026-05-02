@@ -44,8 +44,8 @@ module gearbox #(
   logic [BUFFER_COUNT_WIDTH-1:0] bytes_added;
   logic [BUFFER_COUNT_WIDTH-1:0] bytes_removed;
 
-  logic [BUFFER_COUNT_WIDTH:0] next_stored_byte_count;
-  logic [BUFFER_COUNT_WIDTH:0] free_byte_count_after_output;
+  logic [BUFFER_COUNT_WIDTH:0]   next_stored_byte_count;
+  logic [BUFFER_COUNT_WIDTH:0]   free_byte_count_after_output;
 
   assign input_stream_transfer =
       input_stream_valid
@@ -83,17 +83,17 @@ module gearbox #(
     logic pack_buffer_has_space;
     logic staged_input_transfer;
 
-    logic [INPUT_DATA_WIDTH-1:0] staged_input_data_q;
+    logic [INPUT_DATA_WIDTH-1:0]     staged_input_data_q;
 
-    logic [BUFFER_DATA_WIDTH-1:0] pack_buffer_data_q;
-    logic [BUFFER_DATA_WIDTH-1:0] pack_buffer_data_next;
-    logic [BUFFER_DATA_WIDTH-1:0] pack_buffer_write_data;
-    logic [BUFFER_DATA_WIDTH-1:0] pack_buffer_write_mask;
+    logic [BUFFER_DATA_WIDTH-1:0]    pack_buffer_data_q;
+    logic [BUFFER_DATA_WIDTH-1:0]    pack_buffer_data_next;
+    logic [BUFFER_DATA_WIDTH-1:0]    pack_buffer_write_data;
+    logic [BUFFER_DATA_WIDTH-1:0]    pack_buffer_write_mask;
 
     logic [BUFFER_POINTER_WIDTH-1:0] write_byte_pointer_q;
     logic [BUFFER_POINTER_WIDTH-1:0] write_byte_pointer_next;
-    logic [BUFFER_POINTER_WIDTH:0] write_byte_pointer_sum;
-    logic [BUFFER_POINTER_WIDTH:0] write_byte_pointer_wrap;
+    logic [BUFFER_POINTER_WIDTH:0]   write_byte_pointer_sum;
+    logic [BUFFER_POINTER_WIDTH:0]   write_byte_pointer_wrap;
 
     logic output_lane_q;
     logic output_lane_next;
@@ -162,8 +162,8 @@ module gearbox #(
 
         localparam logic [BUFFER_POINTER_WIDTH:0] INPUT_BYTE_OFFSET = in_byte_i;
 
-        logic [BUFFER_POINTER_WIDTH:0] write_byte_sum;
-        logic [BUFFER_POINTER_WIDTH:0] write_byte_wrap;
+        logic [BUFFER_POINTER_WIDTH:0]   write_byte_sum;
+        logic [BUFFER_POINTER_WIDTH:0]   write_byte_wrap;
         logic [BUFFER_POINTER_WIDTH-1:0] write_byte_pointer;
 
         assign write_byte_sum =
@@ -251,8 +251,8 @@ module gearbox #(
 
     logic [BUFFER_POINTER_WIDTH-1:0] read_byte_pointer_q;
     logic [BUFFER_POINTER_WIDTH-1:0] read_byte_pointer_next;
-    logic [BUFFER_POINTER_WIDTH:0] read_byte_pointer_sum;
-    logic [BUFFER_POINTER_WIDTH:0] read_byte_pointer_wrap;
+    logic [BUFFER_POINTER_WIDTH:0]   read_byte_pointer_sum;
+    logic [BUFFER_POINTER_WIDTH:0]   read_byte_pointer_wrap;
 
     assign output_stream_valid =
        output_stage_valid_q;
@@ -327,8 +327,8 @@ module gearbox #(
 
       localparam logic [BUFFER_POINTER_WIDTH:0] OUTPUT_BYTE_OFFSET = out_byte_i;
 
-      logic [BUFFER_POINTER_WIDTH:0] read_byte_sum;
-      logic [BUFFER_POINTER_WIDTH:0] read_byte_wrap;
+      logic [BUFFER_POINTER_WIDTH:0]   read_byte_sum;
+      logic [BUFFER_POINTER_WIDTH:0]   read_byte_wrap;
       logic [BUFFER_POINTER_WIDTH-1:0] read_byte_pointer;
 
       logic [BUFFER_CAPACITY_BYTES-1:0] buffer_byte_select;
