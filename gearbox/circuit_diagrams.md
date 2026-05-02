@@ -1,7 +1,7 @@
 # Gearbox Circuit Diagrams
 
-These sketches show the two main datapath structures used by the gearbox. They
-are documentation diagrams, not generated schematics.
+These schematic-style diagrams show the two main datapath structures used by
+the gearbox. They are hand-drawn documentation diagrams, not generated netlists.
 
 ## Input Width Smaller Than Output Width
 
@@ -9,7 +9,7 @@ When `INPUT_DATA_WIDTH < OUTPUT_DATA_WIDTH`, the gearbox packs multiple smaller
 input beats into a circular buffer. `output_stream_valid` asserts after enough
 bytes are stored to produce one complete wider output beat.
 
-![Input width smaller than output width](diagrams/input_smaller_than_output.svg)
+![Input width smaller than output width](diagrams/input_smaller_than_output_schematic.svg)
 
 Key ideas:
 
@@ -24,7 +24,7 @@ When `INPUT_DATA_WIDTH > OUTPUT_DATA_WIDTH`, the gearbox stores each wider input
 beat in an unpack buffer. A read pointer selects narrower output beats from the
 buffer and feeds an output stage that can hold data during backpressure.
 
-![Input width larger than output width](diagrams/input_larger_than_output.svg)
+![Input width larger than output width](diagrams/input_larger_than_output_schematic.svg)
 
 Key ideas:
 
