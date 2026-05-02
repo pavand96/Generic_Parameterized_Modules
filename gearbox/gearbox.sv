@@ -11,8 +11,8 @@ module gearbox #(
   localparam bit   WIDTH_CONVERT            = IN_LT_OUT || IN_GT_OUT,
   localparam int   MAX_TFER_CHUNKS          = IN_GT_OUT ? IN_CHUNKS_PER_BEAT : OUT_CHUNKS_PER_BEAT,
   localparam int   MIN_TFER_CHUNKS          = IN_LT_OUT ? IN_CHUNKS_PER_BEAT : OUT_CHUNKS_PER_BEAT,
-  localparam bit   INTEGER_RATIO            = WIDTH_CONVERT && ((MAX_TFER_CHUNKS % MIN_TFER_CHUNKS) == 0),
-  localparam int   BUFFER_CAPACITY_CHUNKS   = INTEGER_RATIO ? MAX_TFER_CHUNKS : (2 * MAX_TFER_CHUNKS),
+  localparam bit   NON_INTEGER_RATIO        = WIDTH_CONVERT && ((MAX_TFER_CHUNKS % MIN_TFER_CHUNKS) != 0),
+  localparam int   BUFFER_CAPACITY_CHUNKS   = NON_INTEGER_RATIO ? (2 * MAX_TFER_CHUNKS) : MAX_TFER_CHUNKS,
   localparam int   BUFFER_DATA_WIDTH        = CHUNK_WIDTH * BUFFER_CAPACITY_CHUNKS,
 
   localparam int   BUFFER_PTR_WIDTH         = $clog2(BUFFER_CAPACITY_CHUNKS),
@@ -53,7 +53,30 @@ module gearbox #(
       out_strm_vld
     & out_strm_rdy;
 
-  if(!INTEGER_RATIO) begin : g_non_exact
+  if(!WIDTH_CONVERT) begin : g_equal_width
+
+    // Equal-width mode is a one-beat rdy/vld skid stage. No chunk packing is
+    // needed.
+    always_ff @(posedge clk or negedge rstn) begin
+      if(~rstn)
+        out_strm_vld <= 1'b0;
+      else
+        out_strm_vld <=
+            in_strm_vld
+          | (out_strm_vld & ~out_strm_rdy);
+    end
+
+    always_ff @(posedge clk) begin
+      if(in_strm_tfer)
+        out_strm_data <= in_strm_data;
+    end
+
+    assign in_strm_rdy =
+        out_strm_rdy
+      | ~out_strm_vld;
+
+  end
+  else if(NON_INTEGER_RATIO) begin : g_non_exact
     if(WIDTH_CONVERT) begin : g_barrel
 
       logic [BUFFER_COUNT_WIDTH-1:0] stored_chunk_count_q;
@@ -362,29 +385,6 @@ module gearbox #(
       end
 
     end
-    else begin : g_equal_width
-
-      // Equal-width mode is a one-beat rdy/vld skid stage. No chunk packing is
-      // needed.
-      always_ff @(posedge clk or negedge rstn) begin
-        if(~rstn)
-          out_strm_vld <= 1'b0;
-        else
-          out_strm_vld <=
-              in_strm_vld
-            | (out_strm_vld & ~out_strm_rdy);
-      end
-
-      always_ff @(posedge clk) begin
-        if(in_strm_tfer)
-          out_strm_data <= in_strm_data;
-      end
-
-      assign in_strm_rdy =
-          out_strm_rdy
-        | ~out_strm_vld;
-
-    end
 
   end
   // Pack mode with an exact ratio fills fixed lanes in one output beat, so it
@@ -436,7 +436,7 @@ module gearbox #(
       assign pack_data_next[IN_DATA_WIDTH*pack_lane_i +: IN_DATA_WIDTH] =
           in_strm_tfer & (pack_write_idx == PACK_LANE_INDEX)
         ? in_strm_data
-        : (out_strm_tfer ? '0 : pack_data_q[IN_DATA_WIDTH*pack_lane_i +: IN_DATA_WIDTH]);
+        : pack_data_q[IN_DATA_WIDTH*pack_lane_i +: IN_DATA_WIDTH];
 
     end
 
@@ -488,7 +488,7 @@ module gearbox #(
         unpack_rem_count_q == UNPACK_ONE_COUNT;
 
     assign unpack_shift_data =
-        {{OUT_DATA_WIDTH{1'b0}}, unpack_data_q[IN_DATA_WIDTH-1:OUT_DATA_WIDTH]};
+        {unpack_data_q[OUT_DATA_WIDTH-1:0], unpack_data_q[IN_DATA_WIDTH-1:OUT_DATA_WIDTH]};
 
     assign unpack_rem_count_next =
         in_strm_tfer
@@ -520,7 +520,7 @@ module gearbox #(
   `ifndef SYNTHESIS
   // Simulation-only protocol checks. These stay outside the generated datapath
   // branches so the same safety properties apply to every parameter set.
-  if(!INTEGER_RATIO && WIDTH_CONVERT) begin : g_barrel_assertions
+  if(NON_INTEGER_RATIO) begin : g_barrel_assertions
 
     assert_stored_chunk_count_in_range:
       assert property (@(posedge clk) disable iff (~rstn)
