@@ -11,9 +11,9 @@ from cocotb.triggers import RisingEdge, Timer
 CLK_PERIOD_NS = 1
 
 
-def bits_per_chunk():
-    value = int(os.environ.get("BITS_PER_CHUNK", "8"))
-    assert value > 0, "BITS_PER_CHUNK must be greater than zero"
+def chunk_width():
+    value = int(os.environ.get("CHUNK_WIDTH", "8"))
+    assert value > 0, "CHUNK_WIDTH must be greater than zero"
     return value
 
 
@@ -24,7 +24,7 @@ def chunk_mask(bits):
 def signal_chunk_width(signal, bits):
     width = len(signal.value)
     assert width % bits == 0, (
-        f"{signal._name} width {width} is not divisible by BITS_PER_CHUNK={bits}"
+        f"{signal._name} width {width} is not divisible by CHUNK_WIDTH={bits}"
     )
     return width // bits
 
@@ -85,7 +85,7 @@ async def run_strm_case(
     rdy_probability,
     seed,
 ):
-    chunk_bits = bits_per_chunk()
+    chunk_bits = chunk_width()
     in_chunks_per_beat = signal_chunk_width(dut.in_strm_data, chunk_bits)
     out_chunks_per_beat = signal_chunk_width(dut.out_strm_data, chunk_bits)
     in_beats = aligned_in_beats(

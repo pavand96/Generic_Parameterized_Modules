@@ -56,7 +56,7 @@ def main():
         help="maximum chunks per beat to test",
     )
     parser.add_argument(
-        "--bits-per-chunk",
+        "--chunk-width",
         type=int,
         default=8,
         help="chunk width in bits",
@@ -83,8 +83,8 @@ def main():
             "--max-chunks-per-beat must be greater than or equal to "
             "--min-chunks-per-beat"
         )
-    if args.bits_per_chunk < 1:
-        parser.error("--bits-per-chunk must be at least 1")
+    if args.chunk_width < 1:
+        parser.error("--chunk-width must be at least 1")
 
     script_dir = Path(__file__).resolve().parent
     seed = args.seed if args.seed is not None else random.randrange(2**32)
@@ -106,7 +106,7 @@ def main():
             f"[{run_idx}/{args.iterations}] "
             f"IN_CHUNKS_PER_BEAT={in_chunks_per_beat} "
             f"OUT_CHUNKS_PER_BEAT={out_chunks_per_beat} "
-            f"BITS_PER_CHUNK={args.bits_per_chunk}"
+            f"CHUNK_WIDTH={args.chunk_width}"
         )
         print(f"{label}: running", flush=True)
 
@@ -120,7 +120,7 @@ def main():
                 "make",
                 f"IN_CHUNKS_PER_BEAT={in_chunks_per_beat}",
                 f"OUT_CHUNKS_PER_BEAT={out_chunks_per_beat}",
-                f"BITS_PER_CHUNK={args.bits_per_chunk}",
+                f"CHUNK_WIDTH={args.chunk_width}",
                 f"WAVES={args.waves}",
             ],
             cwd=script_dir,
@@ -141,7 +141,7 @@ def main():
             print(
                 f"  IN_CHUNKS_PER_BEAT={in_chunks_per_beat} "
                 f"OUT_CHUNKS_PER_BEAT={out_chunks_per_beat} "
-                f"BITS_PER_CHUNK={args.bits_per_chunk}"
+                f"CHUNK_WIDTH={args.chunk_width}"
             )
         return 1
 
