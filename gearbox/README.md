@@ -1,15 +1,15 @@
 # Generic Parameterized Gearbox
 
-SystemVerilog chunk-strm gearbox with a cocotb regression testbench. The
-module converts an in strm with `IN_DATA_WIDTH` bits per beat into an output
-strm with `OUT_DATA_WIDTH` bits per beat while preserving chunk order and
+SystemVerilog chunk-stream gearbox with a cocotb regression testbench. The
+module converts an in stream with `IN_DATA_WIDTH` bits per beat into an output
+stream with `OUT_DATA_WIDTH` bits per beat while preserving chunk order and
 supporting rdy/vld backpressure.
 
 ## Files
 
 - `gearbox.sv` - parameterized SystemVerilog gearbox RTL.
 - `../common/common_pkg.sv` - shared SystemVerilog package with math helpers.
-- `testbench.py` - cocotb chunk-strm regression testbench.
+- `testbench.py` - cocotb chunk-stream regression testbench.
 - `Makefile` - cocotb simulation Makefile.
 - `run_random_params.py` - randomized regression runner for multiple
   `IN_DATA_WIDTH`/`OUT_DATA_WIDTH` parameter pairs.
@@ -70,14 +70,7 @@ that muxing and decode grow with the number of chunk lanes. If the GCD-derived
 `CHUNK_WIDTH` is small, a wide datapath can turn into many lanes, and each lane
 adds mux inputs, compare/decode logic, and buffer flops.
 
-An FSM-style gearbox can reduce area by serializing the work over multiple
-cycles. Instead of wiring every possible chunk rotation in parallel, it can use
-a smaller chunk mover, a counter, and a compact buffer to copy one chunk or a
-small group of chunks per cycle. That trades throughput and latency for less
-parallel muxing, fewer wide dynamic selects, and often easier timing. Use this
-barrel style for high-throughput paths; consider an FSM style when the data
-widths are large, the derived chunk width is small, or the interface can
-tolerate multi-cycle packing/unpacking.
+An FSM-style gearbox can reduce area when input_data_width and output_data_width are co-primes. 
 
 ## Run A Simulation
 
