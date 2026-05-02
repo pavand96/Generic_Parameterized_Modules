@@ -1,5 +1,4 @@
 import math
-import os
 import random
 from collections import deque
 
@@ -11,17 +10,11 @@ from cocotb.triggers import RisingEdge, Timer
 CLK_PERIOD_NS = 1
 
 
-def chunk_width():
-    value = int(os.environ.get("CHUNK_WIDTH", "8"))
-    assert value > 0, "CHUNK_WIDTH must be greater than zero"
-    return value
-
-
 def chunk_mask(bits):
     return (1 << bits) - 1
 
 
-def signal_chunk_width(signal, bits):
+def signal_chunks_per_beat(signal, bits):
     width = len(signal.value)
     assert width % bits == 0, (
         f"{signal._name} width {width} is not divisible by CHUNK_WIDTH={bits}"
@@ -85,9 +78,13 @@ async def run_strm_case(
     rdy_probability,
     seed,
 ):
-    chunk_bits = chunk_width()
-    in_chunks_per_beat = signal_chunk_width(dut.in_strm_data, chunk_bits)
-    out_chunks_per_beat = signal_chunk_width(dut.out_strm_data, chunk_bits)
+    in_data_width = len(dut.in_strm_data.value)
+    out_data_width = len(dut.out_strm_data.value)
+    chunk_bits = math.gcd(in_data_width, out_data_width)
+    assert chunk_bits > 0, "derived CHUNK_WIDTH must be greater than zero"
+
+    in_chunks_per_beat = signal_chunks_per_beat(dut.in_strm_data, chunk_bits)
+    out_chunks_per_beat = signal_chunks_per_beat(dut.out_strm_data, chunk_bits)
     in_beats = aligned_in_beats(
         in_chunks_per_beat,
         out_chunks_per_beat,

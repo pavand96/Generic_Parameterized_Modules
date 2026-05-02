@@ -3,26 +3,22 @@ SIM ?= verilator
 TOPLEVEL_LANG ?= verilog
 
 # parameters
-IN_CHUNKS_PER_BEAT ?= 3
-OUT_CHUNKS_PER_BEAT ?= 5
-CHUNK_WIDTH ?= 8
+IN_DATA_WIDTH ?= 24
+OUT_DATA_WIDTH ?= 40
 WAVES ?= 1
-
-export CHUNK_WIDTH
 
 ifeq ($(TOPLEVEL_LANG),verilog)
 
-    VERILOG_SOURCES = $(PWD)/gearbox.sv
+    VERILOG_SOURCES = $(PWD)/../common/common_pkg.sv
+    VERILOG_SOURCES += $(PWD)/gearbox.sv
 
     ifeq ($(SIM),icarus)
-        COMPILE_ARGS += -Pgearbox.IN_CHUNKS_PER_BEAT=$(IN_CHUNKS_PER_BEAT)
-        COMPILE_ARGS += -Pgearbox.OUT_CHUNKS_PER_BEAT=$(OUT_CHUNKS_PER_BEAT)
-        COMPILE_ARGS += -Pgearbox.CHUNK_WIDTH=$(CHUNK_WIDTH)
+        COMPILE_ARGS += -Pgearbox.IN_DATA_WIDTH=$(IN_DATA_WIDTH)
+        COMPILE_ARGS += -Pgearbox.OUT_DATA_WIDTH=$(OUT_DATA_WIDTH)
 
     else ifeq ($(SIM),verilator)
-        COMPILE_ARGS += -GIN_CHUNKS_PER_BEAT=$(IN_CHUNKS_PER_BEAT)
-        COMPILE_ARGS += -GOUT_CHUNKS_PER_BEAT=$(OUT_CHUNKS_PER_BEAT)
-        COMPILE_ARGS += -GCHUNK_WIDTH=$(CHUNK_WIDTH)
+        COMPILE_ARGS += -GIN_DATA_WIDTH=$(IN_DATA_WIDTH)
+        COMPILE_ARGS += -GOUT_DATA_WIDTH=$(OUT_DATA_WIDTH)
         COMPILE_ARGS += --timing
         COMPILE_ARGS += --assert
         COMPILE_ARGS += -Wno-WIDTHTRUNC
@@ -33,9 +29,8 @@ ifeq ($(TOPLEVEL_LANG),verilog)
         endif
 
     else ifneq ($(filter $(SIM),ius xcelium),)
-        EXTRA_ARGS += -defparam "gearbox.IN_CHUNKS_PER_BEAT=$(IN_CHUNKS_PER_BEAT)"
-        EXTRA_ARGS += -defparam "gearbox.OUT_CHUNKS_PER_BEAT=$(OUT_CHUNKS_PER_BEAT)"
-        EXTRA_ARGS += -defparam "gearbox.CHUNK_WIDTH=$(CHUNK_WIDTH)"
+        EXTRA_ARGS += -defparam "gearbox.IN_DATA_WIDTH=$(IN_DATA_WIDTH)"
+        EXTRA_ARGS += -defparam "gearbox.OUT_DATA_WIDTH=$(OUT_DATA_WIDTH)"
 
     endif
 

@@ -1,28 +1,33 @@
 # Generic Parameterized Gearbox
 
 SystemVerilog chunk-strm gearbox with a cocotb regression testbench. The
-module converts an in strm with `IN_CHUNKS_PER_BEAT` chunks per beat into an output strm
-with `OUT_CHUNKS_PER_BEAT` chunks per beat while preserving chunk order and supporting
-rdy/vld backpressure.
+module converts an in strm with `IN_DATA_WIDTH` bits per beat into an output
+strm with `OUT_DATA_WIDTH` bits per beat while preserving chunk order and
+supporting rdy/vld backpressure.
 
 ## Files
 
 - `gearbox.sv` - parameterized SystemVerilog gearbox RTL.
+- `../common/common_pkg.sv` - shared SystemVerilog package with math helpers.
 - `testbench.py` - cocotb chunk-strm regression testbench.
 - `Makefile` - cocotb simulation Makefile.
 - `run_random_params.py` - randomized regression runner for multiple
-  `IN_CHUNKS_PER_BEAT`/`OUT_CHUNKS_PER_BEAT` parameter pairs.
+  `IN_DATA_WIDTH`/`OUT_DATA_WIDTH` parameter pairs.
 - `wavedrom.md` - sample rdy/vld and backpressure waveforms.
 
 ## Parameters
 
-- `IN_CHUNKS_PER_BEAT` - number of in chunks per transfer beat.
-- `OUT_CHUNKS_PER_BEAT` - number of output chunks per transfer beat.
-- `CHUNK_WIDTH` - number of bits in each chunk.
+- `IN_DATA_WIDTH` - number of bits in each in transfer beat.
+- `OUT_DATA_WIDTH` - number of bits in each output transfer beat.
 
-Both parameters must be greater than zero. Data widths are derived as
-`IN_DATA_WIDTH = CHUNK_WIDTH * IN_CHUNKS_PER_BEAT` and
-`OUT_DATA_WIDTH = CHUNK_WIDTH * OUT_CHUNKS_PER_BEAT`.
+Both parameters must be greater than zero. The RTL derives chunk shape from
+the greatest common divisor of the two data widths:
+
+- `CHUNK_WIDTH = gcd(IN_DATA_WIDTH, OUT_DATA_WIDTH)`
+- `IN_CHUNKS_PER_BEAT = IN_DATA_WIDTH / CHUNK_WIDTH`
+- `OUT_CHUNKS_PER_BEAT = OUT_DATA_WIDTH / CHUNK_WIDTH`
+
+The GCD helper lives in `common_pkg` as `greatest_common_divisor`.
 
 ## Datapath Context
 
@@ -52,6 +57,15 @@ For integer-ratio conversions, `BUFFER_CAPACITY_CHUNKS` collapses to
 barrel buffer. The larger buffer is only used when `NON_INTEGER_RATIO` is true,
 which also requires `IN_CHUNKS_PER_BEAT != OUT_CHUNKS_PER_BEAT`.
 
+## Area Warning
+
+Small derived `CHUNK_WIDTH` values can make `IN_CHUNKS_PER_BEAT` and
+`OUT_CHUNKS_PER_BEAT` large. In non-integer-ratio cases this can blow up area
+because the barrel datapath scales with the number of chunks and uses the
+larger `2 * MAX_TFER_CHUNKS` buffer. For very small chunk widths or very wide
+data paths, an FSM-style gearbox that moves fewer chunks per cycle may be a
+better area tradeoff.
+
 ## Run A Simulation
 
 The default simulator is Verilator.
@@ -60,10 +74,10 @@ The default simulator is Verilator.
 make
 ```
 
-Run with custom chunks per beat:
+Run with custom data widths:
 
 ```sh
-make IN_CHUNKS_PER_BEAT=3 OUT_CHUNKS_PER_BEAT=5 CHUNK_WIDTH=8
+make IN_DATA_WIDTH=24 OUT_DATA_WIDTH=40
 ```
 
 Disable waveform tracing:
@@ -77,7 +91,7 @@ make WAVES=0
 Run Verilator in lint-only mode with assertions enabled:
 
 ```sh
-verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GIN_CHUNKS_PER_BEAT=3 -GOUT_CHUNKS_PER_BEAT=5 -GCHUNK_WIDTH=8 gearbox.sv
+verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GIN_DATA_WIDTH=24 -GOUT_DATA_WIDTH=40 ../common/common_pkg.sv gearbox.sv
 ```
 
 ## Waveform Examples
@@ -99,6 +113,10 @@ Useful options:
 ```sh
 ./run_random_params.py -n 50 --min-chunks-per-beat 1 --max-chunks-per-beat 16 --chunk-width 8 --keep-going --waves 0
 ```
+
+The random runner still accepts chunk-count and chunk-width ranges as a
+convenient way to generate data widths. The RTL receives only `IN_DATA_WIDTH`
+and `OUT_DATA_WIDTH`; its actual chunk width is derived from their GCD.
 
 Use a fixed seed to reproduce a failing run:
 

@@ -46,8 +46,9 @@ signals are high.
 
 ## Packing Smaller In Beats Into Larger Output Beats
 
-For `IN_CHUNKS_PER_BEAT=3` and `OUT_CHUNKS_PER_BEAT=5`, the output strm
-does not assert vld until enough in chunks are stored to form one complete
+For `IN_DATA_WIDTH=24` and `OUT_DATA_WIDTH=40`, the derived shape is three
+8-bit in chunks per beat and five 8-bit output chunks per beat. The output
+strm does not assert vld until enough in chunks are stored to form one complete
 output beat.
 
 ```wavedrom

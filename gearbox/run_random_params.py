@@ -26,7 +26,7 @@ def print_failure(name, result):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run gearbox cocotb regressions with random IN_CHUNKS_PER_BEAT/OUT_CHUNKS_PER_BEAT values."
+        description="Run gearbox cocotb regressions with random IN_DATA_WIDTH/OUT_DATA_WIDTH values."
     )
     parser.add_argument(
         "-n",
@@ -102,11 +102,14 @@ def main():
             args.min_chunks_per_beat,
             args.max_chunks_per_beat,
         )
+        in_data_width = in_chunks_per_beat * args.chunk_width
+        out_data_width = out_chunks_per_beat * args.chunk_width
         label = (
             f"[{run_idx}/{args.iterations}] "
-            f"IN_CHUNKS_PER_BEAT={in_chunks_per_beat} "
-            f"OUT_CHUNKS_PER_BEAT={out_chunks_per_beat} "
-            f"CHUNK_WIDTH={args.chunk_width}"
+            f"IN_DATA_WIDTH={in_data_width} "
+            f"OUT_DATA_WIDTH={out_data_width} "
+            f"(seed chunks {in_chunks_per_beat}->{out_chunks_per_beat}, "
+            f"seed chunk width {args.chunk_width})"
         )
         print(f"{label}: running", flush=True)
 
@@ -118,9 +121,8 @@ def main():
         make = run_command(
             [
                 "make",
-                f"IN_CHUNKS_PER_BEAT={in_chunks_per_beat}",
-                f"OUT_CHUNKS_PER_BEAT={out_chunks_per_beat}",
-                f"CHUNK_WIDTH={args.chunk_width}",
+                f"IN_DATA_WIDTH={in_data_width}",
+                f"OUT_DATA_WIDTH={out_data_width}",
                 f"WAVES={args.waves}",
             ],
             cwd=script_dir,
@@ -131,17 +133,16 @@ def main():
             continue
 
         print_failure(label, make)
-        failures.append((in_chunks_per_beat, out_chunks_per_beat))
+        failures.append((in_data_width, out_data_width))
         if not args.keep_going:
             break
 
     if failures:
-        print("\nFailing parameter pairs:")
-        for in_chunks_per_beat, out_chunks_per_beat in failures:
+        print("\nFailing data width pairs:")
+        for in_data_width, out_data_width in failures:
             print(
-                f"  IN_CHUNKS_PER_BEAT={in_chunks_per_beat} "
-                f"OUT_CHUNKS_PER_BEAT={out_chunks_per_beat} "
-                f"CHUNK_WIDTH={args.chunk_width}"
+                f"  IN_DATA_WIDTH={in_data_width} "
+                f"OUT_DATA_WIDTH={out_data_width}"
             )
         return 1
 

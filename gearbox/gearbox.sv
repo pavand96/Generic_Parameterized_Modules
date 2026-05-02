@@ -1,10 +1,12 @@
-module gearbox #(
-  parameter        IN_CHUNKS_PER_BEAT       = 4,
-  parameter        OUT_CHUNKS_PER_BEAT      = 5,
-  parameter        CHUNK_WIDTH              = 8,
+import common_pkg::*;
 
-  localparam       IN_DATA_WIDTH            = CHUNK_WIDTH * IN_CHUNKS_PER_BEAT,
-  localparam       OUT_DATA_WIDTH           = CHUNK_WIDTH * OUT_CHUNKS_PER_BEAT,
+module gearbox #(
+  parameter int unsigned IN_DATA_WIDTH      = 24,
+  parameter int unsigned OUT_DATA_WIDTH     = 40,
+
+  localparam int unsigned CHUNK_WIDTH       = greatest_common_divisor(IN_DATA_WIDTH, OUT_DATA_WIDTH),
+  localparam int unsigned IN_CHUNKS_PER_BEAT  = IN_DATA_WIDTH / CHUNK_WIDTH,
+  localparam int unsigned OUT_CHUNKS_PER_BEAT = OUT_DATA_WIDTH / CHUNK_WIDTH,
 
   localparam bit   IN_LT_OUT                = IN_CHUNKS_PER_BEAT < OUT_CHUNKS_PER_BEAT,
   localparam bit   IN_GT_OUT                = IN_CHUNKS_PER_BEAT > OUT_CHUNKS_PER_BEAT,
@@ -15,7 +17,7 @@ module gearbox #(
   localparam int   BUFFER_CAPACITY_CHUNKS   = NON_INTEGER_RATIO ? (2 * MAX_TFER_CHUNKS) : MAX_TFER_CHUNKS,
   localparam int   BUFFER_DATA_WIDTH        = CHUNK_WIDTH * BUFFER_CAPACITY_CHUNKS,
 
-  localparam int   BUFFER_PTR_WIDTH         = $clog2(BUFFER_CAPACITY_CHUNKS),
+  localparam int   BUFFER_PTR_WIDTH         = (BUFFER_CAPACITY_CHUNKS > 1) ? $clog2(BUFFER_CAPACITY_CHUNKS) : 1,
   localparam int   BUFFER_COUNT_WIDTH       = $clog2(BUFFER_CAPACITY_CHUNKS + 1),
 
   localparam logic [BUFFER_PTR_WIDTH-1:0]     IN_PTR_STEP         = IN_CHUNKS_PER_BEAT,
