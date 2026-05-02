@@ -26,7 +26,7 @@ def print_failure(name, result):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run gearbox cocotb regressions with random INPUT_BYTES_PER_BEAT/OUTPUT_BYTES_PER_BEAT values."
+        description="Run gearbox cocotb regressions with random INPUT_CHUNKS_PER_BEAT/OUTPUT_CHUNKS_PER_BEAT values."
     )
     parser.add_argument(
         "-n",
@@ -42,18 +42,24 @@ def main():
         help="random seed; printed so failing runs can be reproduced",
     )
     parser.add_argument(
-        "--min-bytes-per-beat",
-        dest="min_bytes_per_beat",
+        "--min-chunks-per-beat",
+        dest="min_chunks_per_beat",
         type=int,
         default=1,
-        help="minimum byte width to test",
+        help="minimum chunks per beat to test",
     )
     parser.add_argument(
-        "--max-bytes-per-beat",
-        dest="max_bytes_per_beat",
+        "--max-chunks-per-beat",
+        dest="max_chunks_per_beat",
         type=int,
         default=10,
-        help="maximum byte width to test",
+        help="maximum chunks per beat to test",
+    )
+    parser.add_argument(
+        "--bits-per-chunk",
+        type=int,
+        default=8,
+        help="chunk width in bits",
     )
     parser.add_argument(
         "--keep-going",
@@ -70,13 +76,15 @@ def main():
 
     if args.iterations < 1:
         parser.error("--iterations must be at least 1")
-    if args.min_bytes_per_beat < 1:
-        parser.error("--min-bytes-per-beat must be at least 1")
-    if args.max_bytes_per_beat < args.min_bytes_per_beat:
+    if args.min_chunks_per_beat < 1:
+        parser.error("--min-chunks-per-beat must be at least 1")
+    if args.max_chunks_per_beat < args.min_chunks_per_beat:
         parser.error(
-            "--max-bytes-per-beat must be greater than or equal to "
-            "--min-bytes-per-beat"
+            "--max-chunks-per-beat must be greater than or equal to "
+            "--min-chunks-per-beat"
         )
+    if args.bits_per_chunk < 1:
+        parser.error("--bits-per-chunk must be at least 1")
 
     script_dir = Path(__file__).resolve().parent
     seed = args.seed if args.seed is not None else random.randrange(2**32)
@@ -86,18 +94,19 @@ def main():
     print(f"seed={seed}", flush=True)
 
     for run_idx in range(1, args.iterations + 1):
-        input_bytes_per_beat = rng.randint(
-            args.min_bytes_per_beat,
-            args.max_bytes_per_beat,
+        input_chunks_per_beat = rng.randint(
+            args.min_chunks_per_beat,
+            args.max_chunks_per_beat,
         )
-        output_bytes_per_beat = rng.randint(
-            args.min_bytes_per_beat,
-            args.max_bytes_per_beat,
+        output_chunks_per_beat = rng.randint(
+            args.min_chunks_per_beat,
+            args.max_chunks_per_beat,
         )
         label = (
             f"[{run_idx}/{args.iterations}] "
-            f"INPUT_BYTES_PER_BEAT={input_bytes_per_beat} "
-            f"OUTPUT_BYTES_PER_BEAT={output_bytes_per_beat}"
+            f"INPUT_CHUNKS_PER_BEAT={input_chunks_per_beat} "
+            f"OUTPUT_CHUNKS_PER_BEAT={output_chunks_per_beat} "
+            f"BITS_PER_CHUNK={args.bits_per_chunk}"
         )
         print(f"{label}: running", flush=True)
 
@@ -109,8 +118,9 @@ def main():
         make = run_command(
             [
                 "make",
-                f"INPUT_BYTES_PER_BEAT={input_bytes_per_beat}",
-                f"OUTPUT_BYTES_PER_BEAT={output_bytes_per_beat}",
+                f"INPUT_CHUNKS_PER_BEAT={input_chunks_per_beat}",
+                f"OUTPUT_CHUNKS_PER_BEAT={output_chunks_per_beat}",
+                f"BITS_PER_CHUNK={args.bits_per_chunk}",
                 f"WAVES={args.waves}",
             ],
             cwd=script_dir,
@@ -121,16 +131,17 @@ def main():
             continue
 
         print_failure(label, make)
-        failures.append((input_bytes_per_beat, output_bytes_per_beat))
+        failures.append((input_chunks_per_beat, output_chunks_per_beat))
         if not args.keep_going:
             break
 
     if failures:
         print("\nFailing parameter pairs:")
-        for input_bytes_per_beat, output_bytes_per_beat in failures:
+        for input_chunks_per_beat, output_chunks_per_beat in failures:
             print(
-                f"  INPUT_BYTES_PER_BEAT={input_bytes_per_beat} "
-                f"OUTPUT_BYTES_PER_BEAT={output_bytes_per_beat}"
+                f"  INPUT_CHUNKS_PER_BEAT={input_chunks_per_beat} "
+                f"OUTPUT_CHUNKS_PER_BEAT={output_chunks_per_beat} "
+                f"BITS_PER_CHUNK={args.bits_per_chunk}"
             )
         return 1
 

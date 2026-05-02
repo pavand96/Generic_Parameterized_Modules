@@ -1,4 +1,5 @@
 import math
+import os
 import random
 from collections import deque
 
@@ -8,23 +9,36 @@ from cocotb.triggers import RisingEdge, Timer
 
 
 CLK_PERIOD_NS = 1
-BITS_PER_BYTE = 8
-BYTE_MASK = 0xFF
 
 
-def signal_byte_width(signal):
-    return len(signal.value) // BITS_PER_BYTE
+def bits_per_chunk():
+    value = int(os.environ.get("BITS_PER_CHUNK", "8"))
+    assert value > 0, "BITS_PER_CHUNK must be greater than zero"
+    return value
 
 
-def bytes_to_word(data):
+def chunk_mask(bits):
+    return (1 << bits) - 1
+
+
+def signal_chunk_width(signal, bits):
+    width = len(signal.value)
+    assert width % bits == 0, (
+        f"{signal._name} width {width} is not divisible by BITS_PER_CHUNK={bits}"
+    )
+    return width // bits
+
+
+def chunks_to_word(data, bits):
     word = 0
-    for idx, byte in enumerate(data):
-        word |= byte << (BITS_PER_BYTE * idx)
+    for idx, chunk in enumerate(data):
+        word |= chunk << (bits * idx)
     return word
 
 
-def word_to_bytes(word, width):
-    return [(word >> (BITS_PER_BYTE * idx)) & BYTE_MASK for idx in range(width)]
+def word_to_chunks(word, width, bits):
+    mask = chunk_mask(bits)
+    return [(word >> (bits * idx)) & mask for idx in range(width)]
 
 
 def signal_to_int(signal, name):
@@ -34,18 +48,19 @@ def signal_to_int(signal, name):
         raise AssertionError(f"{name} has unresolved bits: {signal.value}") from exc
 
 
-def aligned_input_beats(input_bytes_per_beat, output_bytes_per_beat, min_beats):
-    beat_alignment = output_bytes_per_beat // math.gcd(
-        input_bytes_per_beat,
-        output_bytes_per_beat,
+def aligned_input_beats(input_chunks_per_beat, output_chunks_per_beat, min_beats):
+    beat_alignment = output_chunks_per_beat // math.gcd(
+        input_chunks_per_beat,
+        output_chunks_per_beat,
     )
     return beat_alignment * math.ceil(min_beats / beat_alignment)
 
 
-def input_bytes_for_beat(beat_idx, input_bytes_per_beat):
+def input_chunks_for_beat(beat_idx, input_chunks_per_beat, bits):
+    mask = chunk_mask(bits)
     return [
-        ((beat_idx * input_bytes_per_beat + byte_idx) * 37 + 11) & BYTE_MASK
-        for byte_idx in range(input_bytes_per_beat)
+        ((beat_idx * input_chunks_per_beat + chunk_idx) * 37 + 11) & mask
+        for chunk_idx in range(input_chunks_per_beat)
     ]
 
 
@@ -70,33 +85,38 @@ async def run_stream_case(
     ready_probability,
     seed,
 ):
-    input_bytes_per_beat = signal_byte_width(dut.input_stream_data)
-    output_bytes_per_beat = signal_byte_width(dut.output_stream_data)
+    chunk_bits = bits_per_chunk()
+    input_chunks_per_beat = signal_chunk_width(dut.input_stream_data, chunk_bits)
+    output_chunks_per_beat = signal_chunk_width(dut.output_stream_data, chunk_bits)
     input_beats = aligned_input_beats(
-        input_bytes_per_beat,
-        output_bytes_per_beat,
+        input_chunks_per_beat,
+        output_chunks_per_beat,
         min_input_beats,
     )
-    expected_total_bytes = input_beats * input_bytes_per_beat
+    expected_total_chunks = input_beats * input_chunks_per_beat
 
     rng = random.Random(seed)
     expected = deque()
     held_valid = False
-    held_bytes = []
+    held_chunks = []
     held_word = 0
     sent_beats = 0
-    received_bytes = 0
+    received_chunks = 0
     cycle = 0
     max_cycles = max(200, input_beats * 30)
 
     await reset_dut(dut)
 
-    while received_bytes < expected_total_bytes:
+    while received_chunks < expected_total_chunks:
         if not held_valid and sent_beats < input_beats:
             held_valid = rng.random() < valid_probability
             if held_valid:
-                held_bytes = input_bytes_for_beat(sent_beats, input_bytes_per_beat)
-                held_word = bytes_to_word(held_bytes)
+                held_chunks = input_chunks_for_beat(
+                    sent_beats,
+                    input_chunks_per_beat,
+                    chunk_bits,
+                )
+                held_word = chunks_to_word(held_chunks, chunk_bits)
 
         # Drive stimulus immediately after a posedge and hold it stable until
         # the next posedge, where the DUT samples the handshake.
@@ -117,36 +137,40 @@ async def run_stream_case(
         output_handshake = output_stream_valid and output_stream_ready
 
         if input_handshake:
-            expected.extend(held_bytes)
+            expected.extend(held_chunks)
             sent_beats += 1
             held_valid = False
-            held_bytes = []
+            held_chunks = []
             held_word = 0
 
         if output_handshake:
             actual_word = signal_to_int(dut.output_stream_data, "output_stream_data")
-            actual_bytes = word_to_bytes(actual_word, output_bytes_per_beat)
-            assert len(expected) >= output_bytes_per_beat, (
+            actual_chunks = word_to_chunks(
+                actual_word,
+                output_chunks_per_beat,
+                chunk_bits,
+            )
+            assert len(expected) >= output_chunks_per_beat, (
                 f"{name}: DUT produced an output with only "
-                f"{len(expected)} expected bytes queued"
+                f"{len(expected)} expected chunks queued"
             )
-            expected_bytes = [expected.popleft() for _ in range(output_bytes_per_beat)]
-            assert actual_bytes == expected_bytes, (
-                f"{name}: output byte mismatch at byte {received_bytes}: "
-                f"got {actual_bytes}, expected {expected_bytes}"
+            expected_chunks = [expected.popleft() for _ in range(output_chunks_per_beat)]
+            assert actual_chunks == expected_chunks, (
+                f"{name}: output chunk mismatch at chunk {received_chunks}: "
+                f"got {actual_chunks}, expected {expected_chunks}"
             )
-            received_bytes += output_bytes_per_beat
+            received_chunks += output_chunks_per_beat
 
         await RisingEdge(dut.clk)
 
         cycle += 1
         assert cycle < max_cycles, (
             f"{name}: timed out after {cycle} cycles; sent {sent_beats}/"
-            f"{input_beats} beats and received {received_bytes}/"
-            f"{expected_total_bytes} bytes"
+            f"{input_beats} beats and received {received_chunks}/"
+            f"{expected_total_chunks} chunks"
         )
 
-    assert not expected, f"{name}: scoreboard still has {len(expected)} bytes queued"
+    assert not expected, f"{name}: scoreboard still has {len(expected)} chunks queued"
 
     for _ in range(3):
         dut.input_stream_valid.value = 0
@@ -154,13 +178,13 @@ async def run_stream_case(
         dut.output_stream_ready.value = 1
         await Timer(1, unit="ps")
         assert signal_to_int(dut.output_stream_valid, "output_stream_valid") == 0, (
-            f"{name}: output_stream_valid remained asserted after all expected bytes drained"
+            f"{name}: output_stream_valid remained asserted after all expected chunks drained"
         )
         await RisingEdge(dut.clk)
 
 
 @cocotb.test()
-async def byte_stream_regression(dut):
+async def chunk_stream_regression(dut):
     cocotb.start_soon(Clock(dut.clk, CLK_PERIOD_NS, unit="ns").start())
 
     await run_stream_case(

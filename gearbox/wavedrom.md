@@ -46,8 +46,8 @@ signals are high.
 
 ## Packing Smaller Input Beats Into Larger Output Beats
 
-For `INPUT_BYTES_PER_BEAT=3` and `OUTPUT_BYTES_PER_BEAT=5`, the output stream
-does not assert valid until enough input bytes are stored to form one complete
+For `INPUT_CHUNKS_PER_BEAT=3` and `OUTPUT_CHUNKS_PER_BEAT=5`, the output stream
+does not assert valid until enough input chunks are stored to form one complete
 output beat.
 
 ```wavedrom
@@ -57,7 +57,7 @@ output beat.
     { name: "input_stream_valid",  wave: "01.01.01.0....." },
     { name: "input_stream_ready",  wave: "1.............." },
     { name: "input_stream_data",   wave: "x=.x=.x=.x.....", data: ["I0[2:0]", "I1[2:0]", "I2[2:0]"] },
-    { name: "stored bytes",        wave: "x=.=.=.=.=.....", data: ["0", "3", "6", "4", "7"] },
+    { name: "stored chunks",        wave: "x=.=.=.=.=.....", data: ["0", "3", "6", "4", "7"] },
     { name: "output_stream_valid", wave: "0...1.0.1....." },
     { name: "output_stream_ready", wave: "1.............." },
     { name: "output_stream_data",  wave: "x...=.x.=.....", data: ["O0[4:0]", "O1[4:0]"] }
@@ -68,7 +68,7 @@ output beat.
 ## Random Backpressure Test Shape
 
 The cocotb testbench randomly toggles input valid and output ready. The
-scoreboard only updates on handshakes, so stalls do not change expected byte
+scoreboard only updates on handshakes, so stalls do not change expected chunk
 ordering.
 
 ```wavedrom

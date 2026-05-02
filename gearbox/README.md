@@ -1,46 +1,45 @@
 # Generic Parameterized Gearbox
 
-SystemVerilog byte-stream gearbox with a cocotb regression testbench. The
-module converts an input stream with `INPUT_BYTES_PER_BEAT` bytes per beat into an output stream
-with `OUTPUT_BYTES_PER_BEAT` bytes per beat while preserving byte order and supporting
+SystemVerilog chunk-stream gearbox with a cocotb regression testbench. The
+module converts an input stream with `INPUT_CHUNKS_PER_BEAT` chunks per beat into an output stream
+with `OUTPUT_CHUNKS_PER_BEAT` chunks per beat while preserving chunk order and supporting
 ready/valid backpressure.
 
 ## Files
 
 - `gearbox.sv` - parameterized SystemVerilog gearbox RTL.
-- `testbench.py` - cocotb byte-stream regression testbench.
+- `testbench.py` - cocotb chunk-stream regression testbench.
 - `Makefile` - cocotb simulation Makefile.
 - `run_random_params.py` - randomized regression runner for multiple
-  `INPUT_BYTES_PER_BEAT`/`OUTPUT_BYTES_PER_BEAT` parameter pairs.
+  `INPUT_CHUNKS_PER_BEAT`/`OUTPUT_CHUNKS_PER_BEAT` parameter pairs.
 - `wavedrom.md` - sample ready/valid and backpressure waveforms.
 
 ## Parameters
 
-- `INPUT_BYTES_PER_BEAT` - number of input bytes per transfer beat.
-- `OUTPUT_BYTES_PER_BEAT` - number of output bytes per transfer beat.
+- `INPUT_CHUNKS_PER_BEAT` - number of input chunks per transfer beat.
+- `OUTPUT_CHUNKS_PER_BEAT` - number of output chunks per transfer beat.
+- `BITS_PER_CHUNK` - number of bits in each chunk.
 
 Both parameters must be greater than zero. Data widths are derived as
-`INPUT_DATA_WIDTH = BITS_PER_BYTE * INPUT_BYTES_PER_BEAT` and
-`OUTPUT_DATA_WIDTH = BITS_PER_BYTE * OUTPUT_BYTES_PER_BEAT`.
+`INPUT_DATA_WIDTH = BITS_PER_CHUNK * INPUT_CHUNKS_PER_BEAT` and
+`OUTPUT_DATA_WIDTH = BITS_PER_CHUNK * OUTPUT_CHUNKS_PER_BEAT`.
 
 ## Datapath Context
 
-The gearbox uses a byte-granular datapath. In the notes below,
-`IN_DB` refers to `INPUT_BYTES_PER_BEAT` and `OUT_DB` refers to
-`OUTPUT_BYTES_PER_BEAT`.
+The gearbox uses a chunk-granular datapath.
 
-When `IN_DB < OUT_DB`, the gearbox packs multiple narrower input beats into one
-wider output beat. The write side has variable byte alignment because each
-incoming beat can land at a different byte offset inside the output-sized
+When `INPUT_CHUNKS_PER_BEAT < OUTPUT_CHUNKS_PER_BEAT`, the gearbox packs multiple narrower input beats into one
+wider output beat. The write side has variable chunk alignment because each
+incoming beat can land at a different chunk offset inside the output-sized
 buffer. The read side is fixed because the output always selects one aligned
-`OUT_DB` lane. This shape needs one write barrel to steer input bytes into the
+`OUTPUT_CHUNKS_PER_BEAT` lane. This shape needs one write barrel to steer input chunks into the
 correct buffer lanes.
 
-When `IN_DB > OUT_DB`, the gearbox unpacks one wider input beat into multiple
+When `INPUT_CHUNKS_PER_BEAT > OUTPUT_CHUNKS_PER_BEAT`, the gearbox unpacks one wider input beat into multiple
 narrower output beats. The write side stores the input beat at a fixed aligned
-location, while the read side has variable byte alignment as it selects each
-successive `OUT_DB` slice. This shape needs one read barrel to steer the
-selected byte lanes to the output.
+location, while the read side has variable chunk alignment as it selects each
+successive `OUTPUT_CHUNKS_PER_BEAT` slice. This shape needs one read barrel to steer the
+selected chunk lanes to the output.
 
 ## Run A Simulation
 
@@ -50,10 +49,10 @@ The default simulator is Verilator.
 make
 ```
 
-Run with custom byte widths:
+Run with custom chunks per beat:
 
 ```sh
-make INPUT_BYTES_PER_BEAT=3 OUTPUT_BYTES_PER_BEAT=5
+make INPUT_CHUNKS_PER_BEAT=3 OUTPUT_CHUNKS_PER_BEAT=5 BITS_PER_CHUNK=8
 ```
 
 Disable waveform tracing:
@@ -67,7 +66,7 @@ make WAVES=0
 Run Verilator in lint-only mode with assertions enabled:
 
 ```sh
-verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GINPUT_BYTES_PER_BEAT=3 -GOUTPUT_BYTES_PER_BEAT=5 gearbox.sv
+verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GINPUT_CHUNKS_PER_BEAT=3 -GOUTPUT_CHUNKS_PER_BEAT=5 -GBITS_PER_CHUNK=8 gearbox.sv
 ```
 
 ## Waveform Examples
@@ -87,7 +86,7 @@ Run randomized parameter combinations:
 Useful options:
 
 ```sh
-./run_random_params.py -n 50 --min-bytes-per-beat 1 --max-bytes-per-beat 16 --keep-going --waves 0
+./run_random_params.py -n 50 --min-chunks-per-beat 1 --max-chunks-per-beat 16 --bits-per-chunk 8 --keep-going --waves 0
 ```
 
 Use a fixed seed to reproduce a failing run:
