@@ -26,7 +26,7 @@ def print_failure(name, result):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run gearbox cocotb regressions with random INPUT_CHUNKS_PER_BEAT/OUTPUT_CHUNKS_PER_BEAT values."
+        description="Run gearbox cocotb regressions with random IN_CHUNKS_PER_BEAT/OUT_CHUNKS_PER_BEAT values."
     )
     parser.add_argument(
         "-n",
@@ -94,18 +94,18 @@ def main():
     print(f"seed={seed}", flush=True)
 
     for run_idx in range(1, args.iterations + 1):
-        input_chunks_per_beat = rng.randint(
+        in_chunks_per_beat = rng.randint(
             args.min_chunks_per_beat,
             args.max_chunks_per_beat,
         )
-        output_chunks_per_beat = rng.randint(
+        out_chunks_per_beat = rng.randint(
             args.min_chunks_per_beat,
             args.max_chunks_per_beat,
         )
         label = (
             f"[{run_idx}/{args.iterations}] "
-            f"INPUT_CHUNKS_PER_BEAT={input_chunks_per_beat} "
-            f"OUTPUT_CHUNKS_PER_BEAT={output_chunks_per_beat} "
+            f"IN_CHUNKS_PER_BEAT={in_chunks_per_beat} "
+            f"OUT_CHUNKS_PER_BEAT={out_chunks_per_beat} "
             f"BITS_PER_CHUNK={args.bits_per_chunk}"
         )
         print(f"{label}: running", flush=True)
@@ -118,8 +118,8 @@ def main():
         make = run_command(
             [
                 "make",
-                f"INPUT_CHUNKS_PER_BEAT={input_chunks_per_beat}",
-                f"OUTPUT_CHUNKS_PER_BEAT={output_chunks_per_beat}",
+                f"IN_CHUNKS_PER_BEAT={in_chunks_per_beat}",
+                f"OUT_CHUNKS_PER_BEAT={out_chunks_per_beat}",
                 f"BITS_PER_CHUNK={args.bits_per_chunk}",
                 f"WAVES={args.waves}",
             ],
@@ -131,16 +131,16 @@ def main():
             continue
 
         print_failure(label, make)
-        failures.append((input_chunks_per_beat, output_chunks_per_beat))
+        failures.append((in_chunks_per_beat, out_chunks_per_beat))
         if not args.keep_going:
             break
 
     if failures:
         print("\nFailing parameter pairs:")
-        for input_chunks_per_beat, output_chunks_per_beat in failures:
+        for in_chunks_per_beat, out_chunks_per_beat in failures:
             print(
-                f"  INPUT_CHUNKS_PER_BEAT={input_chunks_per_beat} "
-                f"OUTPUT_CHUNKS_PER_BEAT={output_chunks_per_beat} "
+                f"  IN_CHUNKS_PER_BEAT={in_chunks_per_beat} "
+                f"OUT_CHUNKS_PER_BEAT={out_chunks_per_beat} "
                 f"BITS_PER_CHUNK={args.bits_per_chunk}"
             )
         return 1
