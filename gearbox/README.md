@@ -28,15 +28,29 @@ Both parameters must be greater than zero. Data widths are derived as
 
 The gearbox uses a chunk-granular datapath.
 
+The RTL selects one of three datapath shapes at elaboration time:
+
+- Equal width (`IN_CHUNKS_PER_BEAT == OUT_CHUNKS_PER_BEAT`) uses a simple
+  one-beat rdy/vld skid stage.
+- Integer-ratio width conversion uses exact pack/unpack logic and avoids the
+  circular barrel datapath.
+- Non-integer-ratio width conversion uses the circular barrel datapath because
+  output beat boundaries walk across the stored chunks.
+
 When `IN_CHUNKS_PER_BEAT < OUT_CHUNKS_PER_BEAT`, the gearbox packs multiple narrower in beats into one
-wider output beat. Exact ratios use fixed lanes and one output beat of storage.
-Non-exact ratios use a write barrel because each incoming beat can land at a
-different chunk offset inside the output-sized buffer.
+wider output beat. Integer ratios use fixed lanes and one output beat of
+storage. Non-integer ratios use a write barrel because each incoming beat can
+land at a different chunk offset inside the output-sized buffer.
 
 When `IN_CHUNKS_PER_BEAT > OUT_CHUNKS_PER_BEAT`, the gearbox unpacks one wider in beat into multiple
-narrower output beats. Exact ratios use a fixed-width shift path and one in
-beat of storage. Non-exact ratios use a read barrel as they select each
+narrower output beats. Integer ratios use a fixed-width shift path and one in
+beat of storage. Non-integer ratios use a read barrel as they select each
 successive `OUT_CHUNKS_PER_BEAT` slice.
+
+For integer-ratio conversions, `BUFFER_CAPACITY_CHUNKS` collapses to
+`MAX_TFER_CHUNKS`, so the design does not allocate the `2 * MAX_TFER_CHUNKS`
+barrel buffer. The larger buffer is only used when `NON_INTEGER_RATIO` is true,
+which also requires `IN_CHUNKS_PER_BEAT != OUT_CHUNKS_PER_BEAT`.
 
 ## Run A Simulation
 
