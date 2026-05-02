@@ -23,6 +23,25 @@ Both parameters must be greater than zero. Data widths are derived as
 `INPUT_DATA_WIDTH = BITS_PER_BYTE * INPUT_BYTES_PER_BEAT` and
 `OUTPUT_DATA_WIDTH = BITS_PER_BYTE * OUTPUT_BYTES_PER_BEAT`.
 
+## Datapath Context
+
+The gearbox uses a byte-granular datapath. In the notes below,
+`IN_DB` refers to `INPUT_BYTES_PER_BEAT` and `OUT_DB` refers to
+`OUTPUT_BYTES_PER_BEAT`.
+
+When `IN_DB < OUT_DB`, the gearbox packs multiple narrower input beats into one
+wider output beat. The write side has variable byte alignment because each
+incoming beat can land at a different byte offset inside the output-sized
+buffer. The read side is fixed because the output always selects one aligned
+`OUT_DB` lane. This shape needs one write barrel to steer input bytes into the
+correct buffer lanes.
+
+When `IN_DB > OUT_DB`, the gearbox unpacks one wider input beat into multiple
+narrower output beats. The write side stores the input beat at a fixed aligned
+location, while the read side has variable byte alignment as it selects each
+successive `OUT_DB` slice. This shape needs one read barrel to steer the
+selected byte lanes to the output.
+
 ## Run A Simulation
 
 The default simulator is Verilator.
