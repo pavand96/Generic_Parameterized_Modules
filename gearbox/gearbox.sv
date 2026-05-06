@@ -88,12 +88,6 @@ module gearbox #(
       logic [BUFFER_COUNT_WIDTH-1:0] chunks_removed;
 
       logic [BUFFER_COUNT_WIDTH:0]   next_stored_chunk_count;
-      logic [BUFFER_COUNT_WIDTH:0]   free_chunk_count_after_out;
-
-      assign free_chunk_count_after_out =
-          {1'b0, BUFFER_CHUNK_COUNT}
-        - {1'b0, stored_chunk_count_q}
-        + {1'b0, chunks_removed};
 
       assign next_stored_chunk_count =
           {1'b0, stored_chunk_count_q}
@@ -114,6 +108,10 @@ module gearbox #(
       // land at different chunk offsets relative to the output beat.
       if(IN_LT_OUT) begin : g_small_to_large
 
+        localparam logic [BUFFER_COUNT_WIDTH-1:0] PACK_ROOM_NO_OUT_LIMIT =
+            BUFFER_CAPACITY_CHUNKS
+          - IN_CHUNKS_PER_BEAT;
+
         logic staged_in_vld_q;
         logic staged_in_vld_next;
 
@@ -133,6 +131,8 @@ module gearbox #(
         logic out_lane_q;
         logic out_lane_next;
 
+        logic [IN_CHUNKS_PER_BEAT-1:0][BUFFER_PTR_WIDTH-1:0] write_dst_chunk_ptr;
+
         assign out_strm_data =
             out_lane_q
           ? pack_buffer_data_q[2*OUT_DATA_WIDTH-1:OUT_DATA_WIDTH]
@@ -147,7 +147,8 @@ module gearbox #(
           : '0;
 
         assign pack_buffer_has_space =
-            free_chunk_count_after_out >= {1'b0, IN_CHUNK_COUNT};
+            out_strm_tfer
+          | (stored_chunk_count_q <= PACK_ROOM_NO_OUT_LIMIT);
 
         assign in_strm_rdy =
             ~staged_in_vld_q
@@ -185,37 +186,74 @@ module gearbox #(
             out_lane_q
           ^ out_strm_tfer;
 
-        // Write barrel: each staged in chunk is decoded against the current
-        // write ptr and routed into the matching chunk lane of the pack buffer.
+        // Write barrel: calculate the wrapped destination ptr once per input
+        // chunk, then each buffer lane only compares against those ptrs.
+        for(genvar in_chunk_i = 0; in_chunk_i < IN_CHUNKS_PER_BEAT; in_chunk_i = in_chunk_i + 1) begin : g_write_dst_chunk_ptr
+
+          localparam logic [BUFFER_PTR_WIDTH:0] IN_CHUNK_OFFSET = in_chunk_i;
+
+          if(in_chunk_i == 0) begin : g_base_chunk
+
+            assign write_dst_chunk_ptr[in_chunk_i] =
+                write_chunk_ptr_q;
+
+          end
+          else begin : g_offset_chunk
+
+            logic [BUFFER_PTR_WIDTH:0] write_dst_chunk_sum;
+            logic [BUFFER_PTR_WIDTH:0] write_dst_chunk_wrap;
+
+            assign write_dst_chunk_sum =
+                {1'b0, write_chunk_ptr_q}
+              + IN_CHUNK_OFFSET;
+
+            assign write_dst_chunk_wrap =
+                write_dst_chunk_sum
+              - BUFFER_PTR_LIMIT;
+
+            assign write_dst_chunk_ptr[in_chunk_i] =
+                (write_dst_chunk_sum >= BUFFER_PTR_LIMIT)
+              ? write_dst_chunk_wrap[BUFFER_PTR_WIDTH-1:0]
+              : write_dst_chunk_sum[BUFFER_PTR_WIDTH-1:0];
+
+          end
+
+        end
+
         for(genvar out_chunk_i = 0; out_chunk_i < BUFFER_CAPACITY_CHUNKS; out_chunk_i = out_chunk_i + 1) begin : g_pack_buffer_chunk
 
           localparam logic [BUFFER_PTR_WIDTH-1:0] OUT_BUFFER_CHUNK_INDEX = out_chunk_i;
 
-          logic [BUFFER_PTR_WIDTH:0] write_chunk_offset;
-          logic [BUFFER_PTR_WIDTH:0] write_chunk_index;
-          logic write_chunk_enable;
-          logic [CHUNK_WIDTH-1:0] write_chunk_data;
+          logic [IN_CHUNKS_PER_BEAT-1:0] write_src_chunk_sel_oh;
+          logic write_src_chunk_sel_vld;
+          logic [CHUNK_WIDTH-1:0] pack_buffer_chunk_q;
+          logic [CHUNK_WIDTH-1:0] write_src_chunk_data;
 
-          assign write_chunk_offset =
-              ({1'b0, OUT_BUFFER_CHUNK_INDEX} >= {1'b0, write_chunk_ptr_q})
-            ? ({1'b0, OUT_BUFFER_CHUNK_INDEX} - {1'b0, write_chunk_ptr_q})
-            : ({1'b0, OUT_BUFFER_CHUNK_INDEX} + BUFFER_PTR_LIMIT - {1'b0, write_chunk_ptr_q});
+          assign pack_buffer_chunk_q =
+              pack_buffer_data_q[CHUNK_WIDTH*out_chunk_i +: CHUNK_WIDTH];
 
-          assign write_chunk_enable =
-              write_chunk_offset < {1'b0, IN_PTR_STEP};
+          for(genvar in_chunk_i = 0; in_chunk_i < IN_CHUNKS_PER_BEAT; in_chunk_i = in_chunk_i + 1) begin : g_in_chunk_match
+            assign write_src_chunk_sel_oh[in_chunk_i] =
+                write_dst_chunk_ptr[in_chunk_i] == OUT_BUFFER_CHUNK_INDEX;
+          end
 
-          assign write_chunk_index =
-              write_chunk_enable
-            ? write_chunk_offset
-            : '0;
+          assign write_src_chunk_sel_vld =
+              |write_src_chunk_sel_oh;
 
-          assign write_chunk_data =
-              staged_in_data_q[CHUNK_WIDTH*write_chunk_index +: CHUNK_WIDTH];
+          common_chunk_mux #(
+            .CHUNK_WIDTH(CHUNK_WIDTH),
+            .CHUNK_COUNT(IN_CHUNKS_PER_BEAT),
+            .ONEHOT_SELECT(1'b1)
+          ) u_write_chunk_mux (
+            .in_chunk_select(write_src_chunk_sel_oh),
+            .in_chunk_data(staged_in_data_q),
+            .out_chunk_data(write_src_chunk_data)
+          );
 
           assign pack_buffer_data_next[CHUNK_WIDTH*out_chunk_i +: CHUNK_WIDTH] =
-              staged_in_tfer & write_chunk_enable
-            ? write_chunk_data
-            : pack_buffer_data_q[CHUNK_WIDTH*out_chunk_i +: CHUNK_WIDTH];
+              staged_in_tfer & write_src_chunk_sel_vld
+            ? write_src_chunk_data
+            : pack_buffer_chunk_q;
 
         end
 
@@ -244,6 +282,15 @@ module gearbox #(
       end
       else begin : g_large_to_small
 
+        localparam logic [BUFFER_COUNT_WIDTH-1:0] UNPACK_ROOM_NO_OUT_LIMIT =
+            BUFFER_CAPACITY_CHUNKS
+          - IN_CHUNKS_PER_BEAT;
+        localparam logic [BUFFER_COUNT_WIDTH-1:0] UNPACK_ROOM_WITH_OUT_LIMIT =
+            BUFFER_CAPACITY_CHUNKS
+          - IN_CHUNKS_PER_BEAT
+          + OUT_CHUNKS_PER_BEAT;
+        logic [BUFFER_COUNT_WIDTH-1:0] unpack_room_limit;
+
         // Non-exact unpack mode uses a circular read barrel because successive
         // output beats can start at different chunk offsets.
         logic out_from_buffer_vld;
@@ -269,6 +316,8 @@ module gearbox #(
         logic [BUFFER_PTR_WIDTH-1:0] read_chunk_ptr_next;
         logic [BUFFER_PTR_WIDTH:0]   read_chunk_ptr_sum;
         logic [BUFFER_PTR_WIDTH:0]   read_chunk_ptr_wrap;
+
+        logic [OUT_CHUNKS_PER_BEAT-1:0][BUFFER_PTR_WIDTH-1:0] read_src_chunk_ptr;
 
         assign out_strm_vld =
             out_stage_vld_q;
@@ -304,8 +353,13 @@ module gearbox #(
           ? OUT_CHUNK_COUNT
           : '0;
 
+        assign unpack_room_limit =
+            out_from_buffer_tfer
+          ? UNPACK_ROOM_WITH_OUT_LIMIT
+          : UNPACK_ROOM_NO_OUT_LIMIT;
+
         assign in_strm_rdy =
-            free_chunk_count_after_out >= {1'b0, IN_CHUNK_COUNT};
+            stored_chunk_count_q <= unpack_room_limit;
 
         assign chunks_added =
             in_strm_tfer
@@ -338,31 +392,51 @@ module gearbox #(
               : read_chunk_ptr_sum[BUFFER_PTR_WIDTH-1:0])
           : read_chunk_ptr_q;
 
-        // Read barrel: each output chunk lane selects the buffer chunk
-        // addressed by the read ptr plus that lane's chunk offset.
-        for(genvar out_chunk_i = 0; out_chunk_i < OUT_CHUNKS_PER_BEAT; out_chunk_i = out_chunk_i + 1) begin : g_out_chunk_selector
+        // Read barrel: calculate the wrapped source ptr once per output chunk,
+        // then use an indexed chunk mux for the buffer read.
+        for(genvar out_chunk_i = 0; out_chunk_i < OUT_CHUNKS_PER_BEAT; out_chunk_i = out_chunk_i + 1) begin : g_read_src_chunk_ptr
 
           localparam logic [BUFFER_PTR_WIDTH:0] OUT_CHUNK_OFFSET = out_chunk_i;
 
-          logic [BUFFER_PTR_WIDTH:0]   read_chunk_sum;
-          logic [BUFFER_PTR_WIDTH:0]   read_chunk_wrap;
-          logic [BUFFER_PTR_WIDTH-1:0] read_chunk_ptr;
+          if(out_chunk_i == 0) begin : g_base_chunk
 
-          assign read_chunk_sum =
-              {1'b0, read_chunk_ptr_q}
-            + OUT_CHUNK_OFFSET;
+            assign read_src_chunk_ptr[out_chunk_i] =
+                read_chunk_ptr_q;
 
-          assign read_chunk_wrap =
-              read_chunk_sum
-            - BUFFER_PTR_LIMIT;
+          end
+          else begin : g_offset_chunk
 
-          assign read_chunk_ptr =
-              (read_chunk_sum >= BUFFER_PTR_LIMIT)
-            ? read_chunk_wrap[BUFFER_PTR_WIDTH-1:0]
-            : read_chunk_sum[BUFFER_PTR_WIDTH-1:0];
+            logic [BUFFER_PTR_WIDTH:0] read_chunk_sum;
+            logic [BUFFER_PTR_WIDTH:0] read_chunk_wrap;
 
-          assign selected_out_data[CHUNK_WIDTH*out_chunk_i +: CHUNK_WIDTH] =
-              unpack_buffer_data_q[CHUNK_WIDTH*read_chunk_ptr +: CHUNK_WIDTH];
+            assign read_chunk_sum =
+                {1'b0, read_chunk_ptr_q}
+              + OUT_CHUNK_OFFSET;
+
+            assign read_chunk_wrap =
+                read_chunk_sum
+              - BUFFER_PTR_LIMIT;
+
+            assign read_src_chunk_ptr[out_chunk_i] =
+                (read_chunk_sum >= BUFFER_PTR_LIMIT)
+              ? read_chunk_wrap[BUFFER_PTR_WIDTH-1:0]
+              : read_chunk_sum[BUFFER_PTR_WIDTH-1:0];
+
+          end
+
+        end
+
+        for(genvar out_chunk_i = 0; out_chunk_i < OUT_CHUNKS_PER_BEAT; out_chunk_i = out_chunk_i + 1) begin : g_out_chunk_selector
+
+          common_chunk_mux #(
+            .CHUNK_WIDTH(CHUNK_WIDTH),
+            .CHUNK_COUNT(BUFFER_CAPACITY_CHUNKS),
+            .ONEHOT_SELECT(1'b0)
+          ) u_read_chunk_mux (
+            .in_chunk_select(read_src_chunk_ptr[out_chunk_i]),
+            .in_chunk_data(unpack_buffer_data_q),
+            .out_chunk_data(selected_out_data[CHUNK_WIDTH*out_chunk_i +: CHUNK_WIDTH])
+          );
 
         end
 

@@ -6,26 +6,30 @@ not as a changelog for one module.
 
 ## RTL Naming Style
 
-Use descriptive names that state what a signal represents. Avoid short
-abbreviations unless they are established HDL conventions.
+Use descriptive names that state what a signal represents. The gearbox RTL uses
+short project-standard abbreviations for common handshake and pointer terms.
 
 Preferred:
 
-- `input_stream_valid`, `input_stream_data`, `input_stream_ready`
-- `output_stream_valid`, `output_stream_data`, `output_stream_ready`
-- `INPUT_BYTES_PER_BEAT`, `OUTPUT_BYTES_PER_BEAT`
-- `INPUT_DATA_WIDTH`, `OUTPUT_DATA_WIDTH`
-- `BUFFER_CAPACITY_BYTES`, `BUFFER_POINTER_WIDTH`, `BUFFER_COUNT_WIDTH`
-- `stored_byte_count_q`, `stored_byte_count_next`
-- `bytes_added`, `bytes_removed`
-- `read_byte_pointer_q`, `write_byte_pointer_q`
+- `in_strm_vld`, `in_strm_data`, `in_strm_rdy`
+- `out_strm_vld`, `out_strm_data`, `out_strm_rdy`
+- `IN_DATA_WIDTH`, `OUT_DATA_WIDTH`
+- `IN_CHUNKS_PER_BEAT`, `OUT_CHUNKS_PER_BEAT`
+- `BUFFER_CAPACITY_CHUNKS`, `BUFFER_PTR_WIDTH`, `BUFFER_COUNT_WIDTH`
+- `stored_chunk_count_q`, `stored_chunk_count_next`
+- `chunks_added`, `chunks_removed`
+- `read_chunk_ptr_q`, `write_chunk_ptr_q`
+- `in_strm_tfer`, `out_strm_tfer`
 
 Avoid:
 
 - unclear width names like `IN_DW`, `OUT_DW`, `CNT_W`, `PTR_W`
-- unclear byte-count names like `IN_DB`, `OUT_DB`, `BUF_DB`
+- unclear chunk-count names like `IN_DB`, `OUT_DB`, `BUF_DB`
 - vague temporary names like `candidate_hit`, `candidate_bit`
-- directionally confusing stream names such as `ready_out` for input-side ready
+- directionally confusing stream names such as `ready_out` for input-side rdy
+- spelling out `pointer`, `transfer`, `valid`, `ready`, `stream`, `input`, or
+  `output` inside gearbox RTL signal names; use `ptr`, `tfer`, `vld`, `rdy`,
+  `strm`, `in`, and `out`
 
 Use `_q` for registered state and `_next` for next-state combinational values.
 Use active-low reset name `rstn`.
@@ -36,29 +40,52 @@ Prefer named constants over raw literals when the literal has semantic meaning.
 
 Examples:
 
-- `BITS_PER_BYTE = 8`
-- `BYTE_MASK = 0xFF` in Python testbenches
-- `BUFFER_CAPACITY_BYTES = 2 * MAX_TRANSFER_BYTES`
+- `CHUNK_WIDTH`
+- `CHUNK_MASK` in Python testbenches
+- `BUFFER_CAPACITY_CHUNKS = 2 * MAX_TFER_CHUNKS`
 
-Parameter names should describe units. Prefer `*_BYTES_PER_BEAT`,
+Parameter names should describe units. Prefer `*_CHUNKS_PER_BEAT`,
 `*_DATA_WIDTH`, and `*_COUNT` over abbreviated suffixes.
+
+## Packed Array Style
+
+For generated RTL vectors, prefer packed multidimensional arrays instead of
+unpacked arrays of packed vectors. Packed arrays flatten predictably, work well
+with slices, and keep generated datapath wiring easier for tools to optimize.
+
+Preferred:
+
+```systemverilog
+logic [OUT_CHUNKS_PER_BEAT-1:0][BUFFER_PTR_WIDTH-1:0] read_src_chunk_ptr;
+logic [IN_CHUNKS_PER_BEAT-1:0][BUFFER_PTR_WIDTH-1:0] write_dst_chunk_ptr;
+```
+
+Avoid:
+
+```systemverilog
+logic [BUFFER_PTR_WIDTH-1:0] read_src_chunk_ptr [OUT_CHUNKS_PER_BEAT];
+logic [BUFFER_PTR_WIDTH-1:0] write_dst_chunk_ptr [IN_CHUNKS_PER_BEAT];
+```
+
+Use normal generated indexing such as `read_src_chunk_ptr[out_chunk_i]` after
+declaring the array in packed form.
 
 ## Interface Style
 
 For ready/valid streams, name signals by stream side:
 
 ```systemverilog
-input  logic                  input_stream_valid,
-input  logic [DATA_WIDTH-1:0] input_stream_data,
-output logic                  input_stream_ready,
+input  logic                  in_strm_vld,
+input  logic [DATA_WIDTH-1:0] in_strm_data,
+output logic                  in_strm_rdy,
 
-input  logic                  output_stream_ready,
-output logic [DATA_WIDTH-1:0] output_stream_data,
-output logic                  output_stream_valid
+input  logic                  out_strm_rdy,
+output logic [DATA_WIDTH-1:0] out_strm_data,
+output logic                  out_strm_vld
 ```
 
-This makes it clear that `input_stream_ready` is the module's readiness to
-accept input, while `output_stream_ready` comes from the downstream consumer.
+This makes it clear that `in_strm_rdy` is the module's readiness to accept
+input, while `out_strm_rdy` comes from the downstream consumer.
 
 ## Assertion Style
 
@@ -74,18 +101,18 @@ inside:
 Use labeled concurrent assertions:
 
 ```systemverilog
-assert_output_stream_valid_known:
+assert_out_strm_vld_known:
   assert property (@(posedge clk) disable iff (~rstn)
-    !$isunknown(output_stream_valid))
-  else $error("module output_stream_valid is unknown");
+    !$isunknown(out_strm_vld))
+  else $error("module out_strm_vld is unknown");
 ```
 
 Useful assertion categories:
 
 - counter range checks
 - underflow and overflow checks
-- known-value checks on valid/control signals
-- data known when valid is high
+- known-value checks on vld/control signals
+- data known when vld is high
 
 Enable assertions in Verilator simulations with `--assert`.
 
@@ -95,7 +122,7 @@ Run lint from the module directory. Use the same parameters and warning options
 as the simulation Makefile.
 
 ```sh
-verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GINPUT_BYTES_PER_BEAT=3 -GOUTPUT_BYTES_PER_BEAT=5 gearbox.sv
+verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GIN_DATA_WIDTH=24 -GOUT_DATA_WIDTH=40 ../common/common_pkg.sv gearbox.sv
 ```
 
 Keep the lint command documented in the module README. If more modules are
@@ -111,6 +138,9 @@ Keep testbench helper names descriptive:
 - `signal_to_int`
 - `aligned_input_beats`
 - `input_bytes_for_beat`
+- `chunk_bits`
+- `in_chunks_per_beat`
+- `out_chunks_per_beat`
 
 Use named constants in the testbench:
 
@@ -132,7 +162,7 @@ def signal_to_int(signal, name):
 
 ## Random Backpressure Pattern
 
-Drive `valid` and `ready` independently with seeded randomness. Hold an input
+Drive `vld` and `rdy` independently with seeded randomness. Hold an input
 beat stable until the input handshake completes.
 
 Pattern:
@@ -144,34 +174,36 @@ if not held_valid and sent_beats < input_beats:
         held_bytes = input_bytes_for_beat(sent_beats, input_bytes_per_beat)
         held_word = bytes_to_word(held_bytes)
 
-dut.input_stream_valid.value = int(held_valid)
-dut.input_stream_data.value = held_word if held_valid else 0
+dut.in_strm_vld.value = int(held_valid)
+dut.in_strm_data.value = held_word if held_valid else 0
 
 draining = sent_beats >= input_beats and not held_valid
 ready_probability_now = 1.0 if draining else ready_probability
-dut.output_stream_ready.value = int(rng.random() < ready_probability_now)
+dut.out_strm_rdy.value = int(rng.random() < ready_probability_now)
 ```
 
-After a short timer delay, sample ready/valid and update the scoreboard only on
+After a short timer delay, sample rdy/vld and update the scoreboard only on
 handshakes:
 
 ```python
-input_handshake = held_valid and input_stream_ready
-output_handshake = output_stream_valid and output_stream_ready
+input_handshake = held_valid and in_strm_rdy
+output_handshake = out_strm_vld and out_strm_rdy
 ```
 
-When draining after all inputs are sent, force output ready high so the test can
+When draining after all inputs are sent, force output rdy high so the test can
 complete deterministically.
 
 ## Scoreboard Style
 
-Use a byte queue as the reference model for stream ordering.
+Use a byte or chunk queue as the reference model for stream ordering. For
+gearbox, derive `CHUNK_WIDTH` in the test from the GCD of the two signal widths
+and compare data at chunk granularity when exercising non-byte chunk widths.
 
-- Push expected bytes into a `deque` on input handshake.
-- Pop `output_bytes_per_beat` bytes on output handshake.
-- Compare output bytes exactly.
+- Push expected chunks into a `deque` on input handshake.
+- Pop `out_chunks_per_beat` chunks on output handshake.
+- Compare output chunks exactly.
 - Assert the queue is empty at the end of the test.
-- After drain, hold output ready high for a few cycles and check valid drops.
+- After drain, hold output rdy high for a few cycles and check vld drops.
 
 This keeps the test independent of the internal implementation.
 
@@ -184,8 +216,8 @@ Recommended options:
 
 - `--iterations`
 - `--seed`
-- `--min-bytes-per-beat`
-- `--max-bytes-per-beat`
+- `--min-chunks-per-beat`
+- `--max-chunks-per-beat`
 - `--keep-going`
 - `--waves`
 
@@ -194,23 +226,56 @@ Always print the seed so a failing random run can be reproduced.
 Useful smoke command:
 
 ```sh
-./run_random_params.py -n 1 --min-bytes-per-beat 1 --max-bytes-per-beat 4 --waves 0
+./run_random_params.py -n 1 --min-chunks-per-beat 1 --max-chunks-per-beat 4 --waves 0
 ```
 
 Useful broader regression:
 
 ```sh
-./run_random_params.py -n 50 --min-bytes-per-beat 1 --max-bytes-per-beat 16 --keep-going --waves 0
+./run_random_params.py -n 50 --min-chunks-per-beat 1 --max-chunks-per-beat 16 --keep-going --waves 0
 ```
+
+## Gearbox Area Notes
+
+The gearbox has two datapath families:
+
+- Integer-ratio conversions avoid the circular barrel path. `IN < OUT` fills
+  fixed pack lanes; `IN > OUT` shifts a fixed unpack word by one output beat.
+  These cases do not need the non-integer barrel buffer or `2 * MAX_TFER_CHUNKS`
+  storage.
+- Non-integer-ratio conversions use a circular chunk buffer because successive
+  beats can land on different chunk offsets.
+
+Current area-oriented choices:
+
+- `CHUNK_WIDTH` is derived from the GCD of `IN_DATA_WIDTH` and
+  `OUT_DATA_WIDTH`; a very small `CHUNK_WIDTH` creates many chunks and can grow
+  mux/barrel area quickly. For small chunks or wide ratios, prefer an FSM-style
+  gearbox that moves fewer chunks per cycle over a smaller datapath.
+- Occupancy ready logic avoids computing
+  `BUFFER_CAPACITY_CHUNKS - stored_chunk_count_q + chunks_removed` in the ready
+  path. Pack uses one threshold compare plus the output-tfer bypass; unpack
+  muxes the threshold and uses one compare.
+- Pack barrel writes compute wrapped destination ptrs once per incoming chunk,
+  then each buffer lane compares against those ptrs. This avoids add/sub logic
+  per buffer lane, and the zero-offset chunk directly uses the registered ptr.
+- Unpack barrel reads compute wrapped source ptrs once per outgoing chunk and
+  feed a shared indexed chunk mux. The zero-offset chunk directly uses the
+  registered ptr.
+- `common_chunk_mux` is a recursive tree. One-hot mode OR-reduces selected
+  chunks. Indexed mode splits on power-of-two boundaries so the right subtree
+  select uses lower index bits, avoiding per-level subtract-by-constant and
+  range comparator logic.
+- Data flops are not reset; only control state is reset.
 
 ## Standard Verification Flow
 
 Before committing RTL or testbench changes, run:
 
 ```sh
-verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GINPUT_BYTES_PER_BEAT=3 -GOUTPUT_BYTES_PER_BEAT=5 gearbox.sv
-make WAVES=0
-./run_random_params.py -n 1 --min-bytes-per-beat 1 --max-bytes-per-beat 4 --waves 0
+verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GIN_DATA_WIDTH=24 -GOUT_DATA_WIDTH=40 ../common/common_pkg.sv gearbox.sv
+make IN_DATA_WIDTH=24 OUT_DATA_WIDTH=40 WAVES=0
+./run_random_params.py -n 1 --min-chunks-per-beat 1 --max-chunks-per-beat 4 --waves 0
 ```
 
 Generated simulation artifacts such as `sim_build/`, `results.xml`, and
