@@ -7,13 +7,16 @@ supporting rdy/vld backpressure.
 
 ## Files
 
-- `gearbox.sv` - parameterized SystemVerilog gearbox RTL.
+- `gearbox.sv` - parameterized SystemVerilog gearbox RTL (current one-hot).
 - `../common/common_pkg.sv` - shared SystemVerilog package with math helpers.
 - `testbench.py` - cocotb chunk-stream regression testbench.
 - `Makefile` - cocotb simulation Makefile.
 - `run_random_params.py` - randomized regression runner for multiple
   `IN_DATA_WIDTH`/`OUT_DATA_WIDTH` parameter pairs.
-- `run_synth.py` - standalone Yosys synthesis runner for SKY130 HD mapping.
+- `run_synth.py` - standalone Yosys synthesis runner, area-only, one width pair.
+- `run_area_compare.py` - multi-case area sweep comparing adder vs one-hot.
+- `run_timing_sweep.py` - frequency sweep for one width pair; shows the timing–area curve.
+- `run_fmax_compare.py` - multi-case Fmax binary search; finds max clock for each variant.
 - `wavedrom.md` - sample rdy/vld and backpressure waveforms.
 
 ## Parameters
@@ -71,12 +74,11 @@ that muxing and decode grow with the number of chunk lanes. If the GCD-derived
 `CHUNK_WIDTH` is small, a wide datapath can turn into many lanes, and each lane
 adds mux inputs, compare/decode logic, and buffer flops.
 
-An FSM-style gearbox can reduce area when `IN_DATA_WIDTH` and
-`OUT_DATA_WIDTH` are co-prime, or when their GCD is otherwise small. Instead
-of building a full chunk-lane barrel path, an FSM can reuse a narrow shifter,
-small counter, and a smaller staging register across multiple cycles. That
-trades peak throughput and latency for less muxing, less decode, and fewer
-buffer flops.
+An FSM-style gearbox can reduce area when `IN_DATA_WIDTH` and `OUT_DATA_WIDTH`
+are co-prime, or when their GCD is otherwise small. Instead of building a full
+chunk-lane barrel path, an FSM can reuse a narrow shifter, small counter, and a
+smaller staging register across multiple cycles. That trades peak throughput and
+latency for less muxing, less decode, and fewer buffer flops.
 
 ## Run A Simulation
 
@@ -105,31 +107,6 @@ Run Verilator in lint-only mode with assertions enabled:
 ```sh
 verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GIN_DATA_WIDTH=24 -GOUT_DATA_WIDTH=40 ../common/common_pkg.sv gearbox.sv
 ```
-
-## Run Synthesis
-
-`run_synth.py` runs standalone Yosys and maps the gearbox to a SKY130 HD
-Liberty file. The default Liberty location is:
-
-```text
-../third_party/sky130_fd_sc_hd/timing/sky130_fd_sc_hd__tt_025C_1v80.lib
-```
-
-Run a synthesis check with the default `24 -> 40` conversion:
-
-```sh
-./run_synth.py
-```
-
-Run a custom conversion:
-
-```sh
-./run_synth.py --in-data-width 40 --out-data-width 24
-```
-
-The script writes the generated Yosys RTL, Yosys script, mapped netlist, area
-report, and `check` report under `synth_build/`. Use `--liberty <path>` if the
-SKY130 Liberty lives elsewhere.
 
 ## Waveform Examples
 
@@ -160,6 +137,141 @@ Use a fixed seed to reproduce a failing run:
 ```sh
 ./run_random_params.py --seed 1234
 ```
+
+## Synthesis and Comparison
+
+All synthesis scripts use Yosys with a Liberty file.  Two PDKs are available:
+
+```text
+# SKY130 HD  (0.13 µm, TT 25°C 1.8V)
+../third_party/sky130_fd_sc_hd/timing/sky130_fd_sc_hd__tt_025C_1v80.lib
+
+# ASAP7 RVT  (7 nm predictive, TT)
+../third_party/asap7/asap7sc7p5t_RVT_TT_nldm_merged.lib
+```
+
+Pass `--liberty <path>` to any script to switch PDKs.
+
+### Quick single-case synthesis
+
+`run_synth.py` maps one width pair and writes the mapped netlist, area report,
+and DRC check under `synth_build/`.
+
+```sh
+./run_synth.py                                    # default 24→40, SKY130
+./run_synth.py --in-data-width 40 --out-data-width 24
+```
+
+### Multi-case area comparison
+
+`run_area_compare.py` generates random width pairs, synthesizes both the
+`origin/main` adder implementation and the current one-hot implementation, and
+reports mapped area for each case side-by-side.
+
+```sh
+# 50 non-integer-ratio cases on SKY130
+./run_area_compare.py --count 50 --case-set non-integer --jobs 4
+
+# Same cases on ASAP7
+./run_area_compare.py --count 50 --case-set non-integer --jobs 4 \
+    --liberty ../third_party/asap7/asap7sc7p5t_RVT_TT_nldm_merged.lib \
+    --build-dir area_compare_asap7
+```
+
+Outputs `area_compare.csv` and `area_compare.md`.
+
+**Area results (SKY130, 50 non-integer cases):**
+
+| Category | One-hot area vs adder |
+|---|---|
+| `non_integer_pack` | +6.3% |
+| `non_integer_unpack` | +2.3% |
+| Overall geomean | +3.8% |
+
+### Timing sweep for one case
+
+`run_timing_sweep.py` synthesizes one width pair across a list of target
+frequencies and reports the **critical-path delay** and **full-chip area** at
+each point.  Use this to see the timing–area Pareto curve and locate the
+natural Fmax of each variant.
+
+```sh
+# SKY130, 24→40, 200 MHz – 1 GHz
+./run_timing_sweep.py --in-data-width 24 --out-data-width 40 \
+    --freqs 200,300,400,500,600,700,800,900,1000
+
+# ASAP7, same conversion, 500 MHz – 4 GHz
+./run_timing_sweep.py --in-data-width 24 --out-data-width 40 \
+    --liberty ../third_party/asap7/asap7sc7p5t_RVT_TT_nldm_merged.lib \
+    --freqs 500,1000,1500,2000,2500,3000,3500,4000 \
+    --build-dir timing_sweep_asap7
+```
+
+Example output columns (SKY130, 24→40):
+
+```
+ MHz  Period(ps)  Variant                Delay(ps)  Fmax Est   Met    Area(µm²)  Cells
+------------------------------------------------------------------------------------
+ 500        2000  adder_origin_main       2448.06       408     NO    5408.938    453
+ 500        2000  onehot_current          1410.22       709    YES    5440.218    391
+ 700        1429  adder_origin_main       2448.06       408     NO    5408.938    453
+ 700        1429  onehot_current          1410.22       709    YES    5440.218    391
+```
+
+Outputs `timing_sweep.csv` and `timing_sweep.md`.
+
+### Fmax binary search across multiple cases
+
+`run_fmax_compare.py` binary-searches the tightest achievable clock period for
+each (case, variant) pair.  For each candidate period it synthesizes with a
+timing-constrained ABC script and checks whether the reported delay meets the
+target.  Convergence takes ~9–11 synthesis runs per (case, variant); cases run
+in parallel via `--jobs`.
+
+```sh
+# SKY130, 20 non-integer cases, search 50 MHz – 2 GHz
+./run_fmax_compare.py --count 20 --case-set non-integer \
+    --fmax-lo-mhz 50 --fmax-hi-mhz 2000 --jobs 4
+
+# ASAP7, same cases, search up to 5 GHz
+./run_fmax_compare.py --count 20 --case-set non-integer \
+    --liberty ../third_party/asap7/asap7sc7p5t_RVT_TT_nldm_merged.lib \
+    --fmax-lo-mhz 100 --fmax-hi-mhz 5000 --jobs 4 \
+    --build-dir fmax_compare_asap7
+```
+
+Key options:
+
+| Option | Default | Purpose |
+|---|---|---|
+| `--fmax-lo-mhz` | 50 | Loosest target; should always meet timing |
+| `--fmax-hi-mhz` | 3000 | Tightest target; results above this read as `≥ <hi>` |
+| `--fmax-precision-ps` | 50 | Search stops when period window < this |
+| `--jobs` | 1 | Parallel binary searches |
+
+Outputs `fmax_compare.csv` and `fmax_compare.md`, and prints a per-category
+geomean summary:
+
+```
+Summary statistics (onehot / adder)
+  Fmax geomean ratio  (all): X.XX
+  Area geomean ratio  (all): X.XX
+  non_integer_pack     fmax_ratio=X.XX  area_ratio=X.XX
+  non_integer_unpack   fmax_ratio=X.XX  area_ratio=X.XX
+```
+
+**Preliminary Fmax results (SKY130, 2-case smoke):**
+
+| Case | Adder Fmax | One-hot Fmax | Fmax ratio | Area ratio |
+|---|---|---|---|---|
+| 120→160 non-int pack | 137 MHz | 1046 MHz | 7.6× | 1.00 |
+| 72→64 non-int unpack | 236 MHz | 452 MHz | 1.9× | 1.10 |
+
+The one-hot barrel eliminates the multiplexer-tree logic on the critical path
+(`common_chunk_mux` in the adder variant), giving substantially better Fmax at
+near-equal area.  The area comparison results (+3–6% for one-hot) represent the
+area-optimized mapping only; at the same target frequency, both implementations
+use more area than their unconstrained minimum.
 
 ## Clean
 
