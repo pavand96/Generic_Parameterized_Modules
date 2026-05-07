@@ -2,31 +2,7 @@ import common_pkg::*;
 
 module gearbox #(
   parameter int unsigned IN_DATA_WIDTH      = 24,
-  parameter int unsigned OUT_DATA_WIDTH     = 40,
-
-  localparam int unsigned CHUNK_WIDTH         = greatest_common_divisor(IN_DATA_WIDTH, OUT_DATA_WIDTH),
-  localparam int unsigned IN_CHUNKS_PER_BEAT  = IN_DATA_WIDTH / CHUNK_WIDTH,
-  localparam int unsigned OUT_CHUNKS_PER_BEAT = OUT_DATA_WIDTH / CHUNK_WIDTH,
-
-  localparam bit   IN_LT_OUT                = IN_CHUNKS_PER_BEAT < OUT_CHUNKS_PER_BEAT,
-  localparam bit   IN_GT_OUT                = IN_CHUNKS_PER_BEAT > OUT_CHUNKS_PER_BEAT,
-  localparam bit   WIDTH_CONVERT            = IN_LT_OUT || IN_GT_OUT,
-  localparam int   MAX_TFER_CHUNKS          = IN_GT_OUT ? IN_CHUNKS_PER_BEAT : OUT_CHUNKS_PER_BEAT,
-  localparam int   MIN_TFER_CHUNKS          = IN_LT_OUT ? IN_CHUNKS_PER_BEAT : OUT_CHUNKS_PER_BEAT,
-  localparam bit   NON_INTEGER_RATIO        = WIDTH_CONVERT && ((MAX_TFER_CHUNKS % MIN_TFER_CHUNKS) != 0),
-  localparam int   BUFFER_CAPACITY_CHUNKS   = NON_INTEGER_RATIO ? (2 * MAX_TFER_CHUNKS) : MAX_TFER_CHUNKS,
-  localparam int   BUFFER_DATA_WIDTH        = CHUNK_WIDTH * BUFFER_CAPACITY_CHUNKS,
-
-  localparam int   BUFFER_PTR_WIDTH         = (BUFFER_CAPACITY_CHUNKS > 1) ? $clog2(BUFFER_CAPACITY_CHUNKS) : 1,
-  localparam int   BUFFER_COUNT_WIDTH       = $clog2(BUFFER_CAPACITY_CHUNKS + 1),
-
-  localparam logic [BUFFER_PTR_WIDTH-1:0]     IN_PTR_STEP         = IN_CHUNKS_PER_BEAT,
-  localparam logic [BUFFER_PTR_WIDTH-1:0]     OUT_PTR_STEP        = OUT_CHUNKS_PER_BEAT,
-  localparam logic [BUFFER_PTR_WIDTH:0]       BUFFER_PTR_LIMIT    = BUFFER_CAPACITY_CHUNKS,
-
-  localparam logic [BUFFER_COUNT_WIDTH-1:0]   IN_CHUNK_COUNT      = IN_CHUNKS_PER_BEAT,
-  localparam logic [BUFFER_COUNT_WIDTH-1:0]   OUT_CHUNK_COUNT     = OUT_CHUNKS_PER_BEAT,
-  localparam logic [BUFFER_COUNT_WIDTH-1:0]   BUFFER_CHUNK_COUNT  = BUFFER_CAPACITY_CHUNKS
+  parameter int unsigned OUT_DATA_WIDTH     = 40
 )
 (
   input in_strm_vld,
@@ -40,6 +16,30 @@ module gearbox #(
   input clk,
   input rstn
 );
+
+  localparam int unsigned CHUNK_WIDTH         = greatest_common_divisor(IN_DATA_WIDTH, OUT_DATA_WIDTH);
+  localparam int unsigned IN_CHUNKS_PER_BEAT  = IN_DATA_WIDTH / CHUNK_WIDTH;
+  localparam int unsigned OUT_CHUNKS_PER_BEAT = OUT_DATA_WIDTH / CHUNK_WIDTH;
+
+  localparam bit   IN_LT_OUT                = IN_CHUNKS_PER_BEAT < OUT_CHUNKS_PER_BEAT;
+  localparam bit   IN_GT_OUT                = IN_CHUNKS_PER_BEAT > OUT_CHUNKS_PER_BEAT;
+  localparam bit   WIDTH_CONVERT            = IN_LT_OUT || IN_GT_OUT;
+  localparam int   MAX_TFER_CHUNKS          = IN_GT_OUT ? IN_CHUNKS_PER_BEAT : OUT_CHUNKS_PER_BEAT;
+  localparam int   MIN_TFER_CHUNKS          = IN_LT_OUT ? IN_CHUNKS_PER_BEAT : OUT_CHUNKS_PER_BEAT;
+  localparam bit   NON_INTEGER_RATIO        = WIDTH_CONVERT && ((MAX_TFER_CHUNKS % MIN_TFER_CHUNKS) != 0);
+  localparam int   BUFFER_CAPACITY_CHUNKS   = NON_INTEGER_RATIO ? (2 * MAX_TFER_CHUNKS) : MAX_TFER_CHUNKS;
+  localparam int   BUFFER_DATA_WIDTH        = CHUNK_WIDTH * BUFFER_CAPACITY_CHUNKS;
+
+  localparam int   BUFFER_PTR_WIDTH         = (BUFFER_CAPACITY_CHUNKS > 1) ? $clog2(BUFFER_CAPACITY_CHUNKS) : 1;
+  localparam int   BUFFER_COUNT_WIDTH       = $clog2(BUFFER_CAPACITY_CHUNKS + 1);
+
+  localparam logic [BUFFER_PTR_WIDTH-1:0]     IN_PTR_STEP         = IN_CHUNKS_PER_BEAT;
+  localparam logic [BUFFER_PTR_WIDTH-1:0]     OUT_PTR_STEP        = OUT_CHUNKS_PER_BEAT;
+  localparam logic [BUFFER_PTR_WIDTH:0]       BUFFER_PTR_LIMIT    = BUFFER_CAPACITY_CHUNKS;
+
+  localparam logic [BUFFER_COUNT_WIDTH-1:0]   IN_CHUNK_COUNT      = IN_CHUNKS_PER_BEAT;
+  localparam logic [BUFFER_COUNT_WIDTH-1:0]   OUT_CHUNK_COUNT     = OUT_CHUNKS_PER_BEAT;
+  localparam logic [BUFFER_COUNT_WIDTH-1:0]   BUFFER_CHUNK_COUNT  = BUFFER_CAPACITY_CHUNKS;
 
   // Handshake tfers are accepted only when vld and rdy are high in the same
   // cycle. The selected datapath branch uses these pulses to update its local

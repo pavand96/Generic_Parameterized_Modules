@@ -56,18 +56,18 @@ with slices, and keep generated datapath wiring easier for tools to optimize.
 Preferred:
 
 ```systemverilog
-logic [OUT_CHUNKS_PER_BEAT-1:0][BUFFER_PTR_WIDTH-1:0] read_src_chunk_ptr;
-logic [IN_CHUNKS_PER_BEAT-1:0][BUFFER_PTR_WIDTH-1:0] write_dst_chunk_ptr;
+logic [OUT_CHUNKS_PER_BEAT-1:0][BUFFER_CAPACITY_CHUNKS-1:0] out_chunk_rd_src_oh;
+logic [IN_CHUNKS_PER_BEAT-1:0][BUFFER_CAPACITY_CHUNKS-1:0] in_chunk_wr_dst_oh;
 ```
 
 Avoid:
 
 ```systemverilog
-logic [BUFFER_PTR_WIDTH-1:0] read_src_chunk_ptr [OUT_CHUNKS_PER_BEAT];
-logic [BUFFER_PTR_WIDTH-1:0] write_dst_chunk_ptr [IN_CHUNKS_PER_BEAT];
+logic [BUFFER_CAPACITY_CHUNKS-1:0] out_chunk_rd_src_oh [OUT_CHUNKS_PER_BEAT];
+logic [BUFFER_CAPACITY_CHUNKS-1:0] in_chunk_wr_dst_oh [IN_CHUNKS_PER_BEAT];
 ```
 
-Use normal generated indexing such as `read_src_chunk_ptr[out_chunk_i]` after
+Use normal generated indexing such as `out_chunk_rd_src_oh[out_chunk_i]` after
 declaring the array in packed form.
 
 ## Interface Style
@@ -256,17 +256,23 @@ Current area-oriented choices:
   `BUFFER_CAPACITY_CHUNKS - stored_chunk_count_q + chunks_removed` in the ready
   path. Pack uses one threshold compare plus the output-tfer bypass; unpack
   muxes the threshold and uses one compare.
-- Pack barrel writes compute wrapped destination ptrs once per incoming chunk,
-  then each buffer lane compares against those ptrs. This avoids add/sub logic
-  per buffer lane, and the zero-offset chunk directly uses the registered ptr.
-- Unpack barrel reads compute wrapped source ptrs once per outgoing chunk and
-  feed a shared indexed chunk mux. The zero-offset chunk directly uses the
-  registered ptr.
+- Non-integer pack barrel writes use a one-hot write ptr. Destination ptrs are
+  constant rotations of that one-hot vector, so write destination generation is
+  wiring instead of add/subtract/compare logic. Buffer data is written with
+  chunk-wise flops gated by `chunk_wr_en`; the write path does not instantiate
+  `common_chunk_mux`.
+- Non-integer unpack barrel reads use a one-hot read ptr. Source ptrs are
+  constant rotations of that one-hot vector, so read source generation is wiring
+  instead of add/subtract/compare logic. Selected output data is built with a
+  one-hot gated OR; the read path does not instantiate `common_chunk_mux`.
 - `common_chunk_mux` is a recursive tree. One-hot mode OR-reduces selected
   chunks. Indexed mode splits on power-of-two boundaries so the right subtree
   select uses lower index bits, avoiding per-level subtract-by-constant and
   range comparator logic.
-- Data flops are not reset; only control state is reset.
+- Data flops are not reset; only control state is reset. Datapath flops should
+  use clock-enable style updates so they only clock on real data movement:
+  input load, output stage load, chunk write, or unpack shift. Avoid assigning a
+  held `_next` value to wide data flops every cycle.
 
 ## Standard Verification Flow
 

@@ -13,6 +13,7 @@ supporting rdy/vld backpressure.
 - `Makefile` - cocotb simulation Makefile.
 - `run_random_params.py` - randomized regression runner for multiple
   `IN_DATA_WIDTH`/`OUT_DATA_WIDTH` parameter pairs.
+- `run_synth.py` - standalone Yosys synthesis runner for SKY130 HD mapping.
 - `wavedrom.md` - sample rdy/vld and backpressure waveforms.
 
 ## Parameters
@@ -70,7 +71,12 @@ that muxing and decode grow with the number of chunk lanes. If the GCD-derived
 `CHUNK_WIDTH` is small, a wide datapath can turn into many lanes, and each lane
 adds mux inputs, compare/decode logic, and buffer flops.
 
-An FSM-style gearbox can reduce area when input_data_width and output_data_width are co-primes. 
+An FSM-style gearbox can reduce area when `IN_DATA_WIDTH` and
+`OUT_DATA_WIDTH` are co-prime, or when their GCD is otherwise small. Instead
+of building a full chunk-lane barrel path, an FSM can reuse a narrow shifter,
+small counter, and a smaller staging register across multiple cycles. That
+trades peak throughput and latency for less muxing, less decode, and fewer
+buffer flops.
 
 ## Run A Simulation
 
@@ -99,6 +105,31 @@ Run Verilator in lint-only mode with assertions enabled:
 ```sh
 verilator --lint-only --timing --assert -Wno-WIDTHTRUNC -GIN_DATA_WIDTH=24 -GOUT_DATA_WIDTH=40 ../common/common_pkg.sv gearbox.sv
 ```
+
+## Run Synthesis
+
+`run_synth.py` runs standalone Yosys and maps the gearbox to a SKY130 HD
+Liberty file. The default Liberty location is:
+
+```text
+../third_party/sky130_fd_sc_hd/timing/sky130_fd_sc_hd__tt_025C_1v80.lib
+```
+
+Run a synthesis check with the default `24 -> 40` conversion:
+
+```sh
+./run_synth.py
+```
+
+Run a custom conversion:
+
+```sh
+./run_synth.py --in-data-width 40 --out-data-width 24
+```
+
+The script writes the generated Yosys RTL, Yosys script, mapped netlist, area
+report, and `check` report under `synth_build/`. Use `--liberty <path>` if the
+SKY130 Liberty lives elsewhere.
 
 ## Waveform Examples
 
